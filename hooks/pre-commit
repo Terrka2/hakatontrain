@@ -1,0 +1,61 @@
+#!/bin/sh
+# pre-commit: не даём закоммитить тяжёлые файлы (>5MB) и артефакты/секреты.
+#
+# Установка (один раз в клоне):
+#   git config core.hooksPath hooks
+# На Linux/macOS, если бит выполнения не приехал с клоном:
+#   chmod +x hooks/pre-commit
+#
+# Ловит проблему ДО коммита. Серверная копия этой же проверки - .github/workflows/size-check.yml
+
+MAX_MB=5
+MAX_BYTES=$((MAX_MB * 1024 * 1024))
+
+tmp=$(mktemp) || exit 1
+trap 'rm -f "$tmp"' EXIT
+
+# core.quotePath=false - чтобы имена файлов с кириллицей не экранировались
+git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR > "$tmp" 2>/dev/null
+[ -s "$tmp" ] || exit 0
+
+blocked=0
+while IFS= read -r file; do
+    [ -z "$file" ] && continue
+
+    reason=""
+    case "$file" in
+        node_modules/*|*/node_modules/*)  reason="зависимости (node_modules)" ;;
+        venv/*|*/venv/*|env/*|*/env/*)    reason="виртуальное окружение (venv/env)" ;;
+        __pycache__/*|*/__pycache__/*)    reason="байткод Python (__pycache__)" ;;
+        .env|*/.env|*.env|*.env.local)    reason="секреты (.env)" ;;
+        *.pem|*.key)                      reason="ключи и сертификаты" ;;
+        *.db|*.sqlite|*.sqlite3|dump.sql) reason="дампы БД" ;;
+    esac
+
+    if [ -n "$reason" ]; then
+        printf 'ЗАБЛОКИРОВАНО: %s -> %s\n' "$file" "$reason"
+        blocked=1
+        continue
+    fi
+
+    # :file - версия из индекса, т.е. ровно то, что уходит в коммит
+    size=$(git cat-file -s ":$file" 2>/dev/null || echo 0)
+    if [ "$size" -gt "$MAX_BYTES" ]; then
+        mb=$(awk -v s="$size" 'BEGIN { printf "%.2f", s / 1048576 }')
+        printf 'ЗАБЛОКИРОВАНО: %s -> %s MB (лимит %s MB)\n' "$file" "$mb" "$MAX_MB"
+        blocked=1
+    fi
+done < "$tmp"
+
+if [ "$blocked" -ne 0 ]; then
+    cat <<'MSG'
+
+Коммит отменён. Что делать:
+  * зависимости и окружения не коммитим - они уже в .gitignore;
+  * тяжёлые файлы (>5MB) не храним в git: выложите файл в облако и добавьте ссылку в docs/;
+  * если файл попал в индекс случайно: git restore --staged <файл>
+MSG
+    exit 1
+fi
+
+exit 0

@@ -1,0 +1,76 @@
+name: size-check
+
+# Stop condition контракта: PR с файлами >5MB отклоняется автоматически.
+# Дополнительно блокируются артефакты и секреты (node_modules, venv, .env, дампы БД, ключи),
+# которые не должны попадать в репозиторий даже случайно.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Лимит 5MB и запрещённые файлы
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Проверить изменённые файлы
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MAX_BYTES: '5242880'
+        run: |
+          set -euo pipefail
+
+          if [ -z "${BASE_SHA:-}" ]; then
+            echo "BASE_SHA не задан - проверка пропущена (workflow рассчитан на pull_request)."
+            exit 0
+          fi
+
+          echo "Лимит файла: $((MAX_BYTES / 1048576)) MB. Диапазон: ${BASE_SHA}...HEAD"
+
+          # core.quotePath=false - чтобы имена файлов с кириллицей не экранировались
+          git -c core.quotePath=false diff --name-only --diff-filter=ACMR "${BASE_SHA}...HEAD" > changed.txt
+
+          blocked=0
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            reason=""
+            case "$file" in
+              node_modules/*|*/node_modules/*)  reason="зависимости (node_modules)" ;;
+              venv/*|*/venv/*|env/*|*/env/*)    reason="виртуальное окружение (venv/env)" ;;
+              __pycache__/*|*/__pycache__/*)    reason="байткод Python (__pycache__)" ;;
+              .env|*/.env|*.env|*.env.local)    reason="секреты (.env)" ;;
+              *.pem|*.key)                      reason="ключи и сертификаты" ;;
+              *.db|*.sqlite|*.sqlite3|dump.sql) reason="дампы БД" ;;
+            esac
+
+            if [ -n "$reason" ]; then
+              echo "::error file=${file}::Запрещено коммитить: ${reason}. Такой файл должен быть в .gitignore."
+              blocked=1
+              continue
+            fi
+
+            size=$(git cat-file -s "HEAD:${file}" 2>/dev/null || echo 0)
+            if [ "$size" -gt "$MAX_BYTES" ]; then
+              mb=$(awk -v s="$size" 'BEGIN { printf "%.2f", s / 1048576 }')
+              echo "::error file=${file}::Файл ${mb} MB превышает лимит 5 MB. Тяжёлые медиа не храним в git: ссылка идёт в docs/."
+              blocked=1
+            fi
+          done < changed.txt
+
+          if [ "$blocked" -ne 0 ]; then
+            echo "PR отклонён. Гит-пушер: напомните автору про .gitignore и правила хранения ссылок в docs/."
+            exit 1
+          fi
+
+          echo "OK: все изменённые файлы проходят проверку."

@@ -1,0 +1,32 @@
+# Зависимости
+node_modules/
+venv/
+env/
+__pycache__/
+
+# Файлы окружения и секреты
+.env
+.env.local
+*.pem
+*.key
+
+# Базы данных и тяжелые файлы локальных сборок
+*.db
+*.sqlite
+*.sqlite3
+dump.sql
+.DS_Store
+Thumbs.db
+
+# Тяжелые медиа (хранить только ссылки в docs/)
+*.mp4
+*.mov
+*.avi
+*.psd
+*.fig
+
+# Логи и временные файлы
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

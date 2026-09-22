@@ -2,10 +2,16 @@ import "maplibre-gl/dist/maplibre-gl.css"
 
 import type { StyleSpecification } from "maplibre-gl"
 import { useCallback, useEffect, useMemo, useRef } from "react"
-import MapGL, { type MapRef, NavigationControl } from "react-map-gl/maplibre"
+import MapGL, {
+  Layer,
+  type MapRef,
+  NavigationControl,
+  Source,
+} from "react-map-gl/maplibre"
 
 import { ClusterMarker } from "./ClusterMarker"
-import type { BBox, ClusterOut, MapLayer } from "./types"
+import { resolveCssColor, routeFeatures } from "./routes"
+import type { BBox, ClusterOut, CrewRoute, MapLayer } from "./types"
 
 /** Кишинёв, центр. */
 export const CHISINAU = { longitude: 28.84, latitude: 47.024, zoom: 12.6 }
@@ -60,6 +66,32 @@ export function CityMap({
         .sort((a, b) => a.score - b.score || a.id.localeCompare(b.id)),
     [clusterLayer?.items],
   )
+  // Маршруты: слой routes (все бригады) и crew (одна бригада, пройденное серым). layers приходят из query — идентичность стабильна.
+  const routeData = useMemo(() => {
+    const routes: CrewRoute[] = layers.flatMap((l) =>
+      l.kind === "routes" ? l.routes : l.kind === "crew" ? [l.route] : [],
+    )
+    const fc = routeFeatures(routes, routes.map((r) => r.crew_id).sort())
+    const colors = new Map<string, string>()
+    for (const f of fc.features)
+      if (!colors.has(f.properties.color))
+        colors.set(f.properties.color, resolveCssColor(f.properties.color))
+    const muted = resolveCssColor("--muted-foreground")
+    return {
+      ...fc,
+      features: fc.features.map((f) => ({
+        ...f,
+        properties: {
+          ...f.properties,
+          color:
+            f.properties.part === "done"
+              ? muted
+              : (colors.get(f.properties.color) ?? "transparent"),
+        },
+      })),
+    }
+  }, [layers])
+
   const fitAll = useCallback(() => {
     const box = boundsOf(ordered)
     const map = mapRef.current
@@ -90,6 +122,35 @@ export function CityMap({
         style={{ width: "100%", height: "100%" }}
       >
         <NavigationControl position="top-right" showCompass={false} />
+        {routeData.features.length > 0 && (
+          <Source id="crew-routes" type="geojson" data={routeData}>
+            <Layer
+              id="crew-routes-casing"
+              type="line"
+              paint={{
+                "line-color": ["get", "color"],
+                "line-width": 7,
+                "line-opacity": 0.25,
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id="crew-routes-line"
+              type="line"
+              paint={{
+                "line-color": ["get", "color"],
+                "line-width": 3,
+                "line-dasharray": [
+                  "case",
+                  ["==", ["get", "part"], "done"],
+                  ["literal", [1, 2]],
+                  ["literal", [1, 0]],
+                ],
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+          </Source>
+        )}
         {ordered.map((c) => (
           <ClusterMarker
             key={c.id}

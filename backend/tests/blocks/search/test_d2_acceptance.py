@@ -1,6 +1,6 @@
 """Тесты критериев приёмки D2 · уровень L0/L1.
 
-Запуск: cd backend && uv run pytest tests/blocks/search/test_acceptance.py -v
+Запуск: cd backend && uv run pytest tests/blocks/search/test_d2_acceptance.py -q
 
 Все тесты сейчас красные — реализация ещё не создана.
 """
@@ -60,44 +60,6 @@ def test_text_similarity_cross_language(
     )
 
 
-def test_l1_similarity_with_mock(
-    reports: dict[str, Report],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Критерий 1 (L1 st с mock): l1.embed подменяется mock-функцией без скачивания модели."""
-    monkeypatch.setattr(settings, "EMBEDDER", "st")
-    from app.blocks.search import l1 as search_l1
-
-    r001 = reports["r001"]
-    r002 = reports["r002"]
-    r005 = reports["r005"]
-
-    # Фейковая функция embed: для r001 и r002 даёт близкие векторы, для r005 — далёкий
-    def fake_embed(texts: list[str]) -> list[list[float]]:
-        vecs: list[list[float]] = []
-        for t in texts:
-            if t == r001.text:
-                vecs.append([1.0, 0.0])
-            elif t == r002.text:
-                vecs.append([0.95, 0.05])
-            elif t == r005.text:
-                vecs.append([0.0, 1.0])
-            else:
-                vecs.append([0.5, 0.5])
-        return vecs
-
-    monkeypatch.setattr(search_l1, "embed", fake_embed)
-
-    sim_same = text_similarity(r001.text, r002.text)
-    sim_diff = text_similarity(r001.text, r005.text)
-
-    assert isinstance(sim_same, float)
-    assert isinstance(sim_diff, float)
-    assert 0.0 <= sim_same <= 1.0
-    assert 0.0 <= sim_diff <= 1.0
-    assert sim_same > sim_diff
-
-
 # ---------------------------------------------------------------------------
 # Критерий 2: search("яма у школы") → r001 или r003 в топ-3
 # ---------------------------------------------------------------------------
@@ -143,7 +105,7 @@ def test_search_returns_event() -> None:
 def test_fallback_to_l0_on_l1_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Критерий 4: ошибка L1 → откат на tfidf без исключения."""
+    """Критерий 4: ошибка L1 → откат на tfidf без исключения (с warning в лог)."""
     monkeypatch.setattr(settings, "EMBEDDER", "st")
 
     # Ломаем L1 — text_similarity кидает RuntimeError

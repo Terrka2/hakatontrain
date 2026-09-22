@@ -33,8 +33,8 @@ def centroid(points: list[GeoPoint]) -> GeoPoint:
 
 
 def within(center: GeoPoint, points: list[GeoPoint], radius_m: float) -> list[int]:
-    """Возвращает индексы точек из points, находящихся в пределах radius_m от center."""
-    return [i for i, p in enumerate(points) if haversine_m(center, p) <= radius_m]
+    """Возвращает индексы точек из points, расстояние от center до которых <= radius_m."""
+    return [idx for idx, pt in enumerate(points) if haversine_m(center, pt) <= radius_m]
 
 
 def distance_to_polyline_m(p: GeoPoint, line: list[GeoPoint]) -> tuple[float, float]:

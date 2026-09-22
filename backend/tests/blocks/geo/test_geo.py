@@ -51,7 +51,7 @@ def test_criterion_1_haversine_fixture_distances(fixture_data: dict[str, Any]) -
     assert 385.0 <= dist_7_10 <= 393.0, f"Expected 385-393m, got {dist_7_10}m"
 
 
-def test_criterion_2_within_event_radius(fixture_data: dict[str, Any]) -> None:
+def test_criterion_2_within(fixture_data: dict[str, Any]) -> None:
     """Критерий 2: within вокруг события e1 с радиусом 400 м находит r012 и r013 и не находит r001."""
     e1_data = next(e for e in fixture_data["events"] if e["id"] == "e1")
     center = GeoPoint(**e1_data["location"])

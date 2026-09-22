@@ -1,5 +1,6 @@
 """Роуты блока B8. Контракт: docs/contracts/B8_fieldwork.md."""
 
+import json
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ from pydantic import ValidationError
 from app.api.deps import require_roles
 from app.blocks.fieldwork import apply_update, get_crew_route, progress
 from app.contracts.models import CrewRoute, JobUpdate, RouteStop
+from app.db import Repository, get_repository
 from app.models import User
 
 router = APIRouter(prefix="/crew", tags=["crew"])
@@ -28,7 +30,10 @@ def get_my_route(current_user: CrewUser) -> CrewRoute:
 
 @router.post("/jobs/{job_id}/status", response_model=RouteStop)
 async def update_job_status(
-    job_id: str, request: Request, current_user: CrewUser
+    job_id: str,
+    request: Request,
+    current_user: CrewUser,
+    repo: Repository = Depends(get_repository),
 ) -> RouteStop:
     content_type = request.headers.get("content-type", "")
     photo_url: str | None = None
@@ -49,6 +54,26 @@ async def update_job_status(
 
         at_val = form.get("at")
         at_dt = datetime.fromisoformat(str(at_val)) if at_val else datetime.now()
+
+        loc_data: Any = None
+        if "location" in form:
+            loc_val = form.get("location")
+            if isinstance(loc_val, str):
+                try:
+                    loc_data = json.loads(loc_val)
+                except Exception:
+                    pass
+            elif isinstance(loc_val, dict):
+                loc_data = loc_val
+        if loc_data is None and "lat" in form and "lon" in form:
+            try:
+                loc_data = {
+                    "lat": float(str(form.get("lat"))),
+                    "lon": float(str(form.get("lon"))),
+                }
+            except Exception:
+                pass
+
         payload = {
             "job_id": str(form.get("job_id", job_id)),
             "crew_id": str(form.get("crew_id", current_user.crew_id or "")),
@@ -59,6 +84,8 @@ async def update_job_status(
             "needs_skill": form.get("needs_skill"),
             "note": form.get("note"),
         }
+        if loc_data is not None:
+            payload["location"] = loc_data
     else:
         payload = await request.json()
 
@@ -72,7 +99,7 @@ async def update_job_status(
     cid = current_user.crew_id
     if not current_user.is_superuser and cid and cid != update.crew_id:
         raise HTTPException(403, "Чужая бригада")
-    return apply_update(update)
+    return apply_update(update, repo=repo)
 
 
 @router.get(

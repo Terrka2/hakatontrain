@@ -15,7 +15,7 @@ OUT = ROOT / "docs/contracts"
 
 PEOPLE = {
     "A": "Арсений",
-    "D": "Дорофей",
+    "L": "Лео",
     "Z": "Женёк",
     "P": "Пашок",
     "N": "Некит",
@@ -24,8 +24,8 @@ PEOPLE = {
 ROLES = {
     # code: (pair-ветка, роль одним абзацем, порядок блоков с пометкой «когда»)
     "A": ("pair/frontend",
-          "Интегратор и фронтенд. Собираю экраны руководителя и бригады, держу карту блоков и утверждаю merge. Ко мне идут с вопросами по контрактам и когда что-то не стыкуется между блоками.",
-          [("F1", "ядро"), ("F2", "ядро"), ("F3", "ядро"), ("F4", "ядро"), ("F5", "ядро"), ("F7", "только по команде Арсения")]),
+          "Интегратор и фронтенд. Карта и каркас экрана, пульт руководителя, панель ассистента. Держу карту блоков и утверждаю merge. Ко мне идут с вопросами по контрактам и когда что-то не стыкуется между блоками.",
+          [("F1", "ядро"), ("F3", "ядро"), ("F4", "ядро"), ("F7", "только по команде Арсения")]),
     "Z": ("pair/backend",
           "Ядро бэкенда. Каркас, цикл оператора, склейка дубликатов, диспетчер маршрутов. Мои блоки — то, что остальные бэкенд-блоки вызывают, поэтому мои порты замораживаются первыми.",
           [("C0", "сделан заранее — проверить и принять"), ("B0", "ядро"), ("B3", "ядро"), ("B6", "ядро"), ("B7", "только по команде Арсения")]),
@@ -35,9 +35,9 @@ ROLES = {
     "P": ("pair/backend",
           "Бэкенд-блоки с чёткими входами и выходами: импорт данных, гео-утилиты, приоритет, контекст, работа бригад. Каждый блок — отдельная небольшая задача с готовыми тестами на fixture.",
           [("B1", "ядро"), ("B2", "ядро"), ("B4", "ядро"), ("B5", "ядро"), ("B8", "ядро"), ("X1", "только по команде Арсения")]),
-    "D": ("pair/frontend",
-          "Дизайн-система и внешний вид. Токены, бейджи, иконки, пустые и ошибочные состояния, проход по всем экранам глазами обычного человека. Логику не трогаю.",
-          [("F6", "ядро")]),
+    "L": ("pair/frontend",
+          "Фронтенд в паре с Арсением. Первой — дизайн-система, её ждут все экраны; потом очередь с карточкой проблемы и экран бригады на телефоне. Запасной по карте, пульту руководителя и экрану жителя. Вопросы по контракту — к Арсению.",
+          [("F6", "ядро"), ("F2", "ядро"), ("F5", "ядро")]),
 }
 
 TEAM_README = """\
@@ -817,7 +817,7 @@ def execute_pending(action: PendingAction, role: str, actor: str) -> BaseModel: 
   forbidden=["Инструмент «выполни произвольный SQL / HTTP / код».", "Инструмент, который ставит `approved` без человека.", "Дублировать логику блоков внутри инструментов."]),
 
  # ------------------------------------------------------------------ FRONTEND
- dict(id="F1", name="map", title="Карта и каркас экрана", group="FRONTEND", owner="A", backup="Z", reviewer="N", branch="pair/frontend",
+ dict(id="F1", name="map", title="Карта и каркас экрана", group="FRONTEND", owner="A", backup="L", reviewer="N", branch="pair/frontend",
   depends=["C0"], consumers=["F2", "F3", "F5"],
   goal="Карта — главный экран. Один компонент карты на всё приложение; остальные фичи только передают ей слои.",
   paths=["frontend/src/features/map/**", "frontend/src/routes/_layout/index.tsx", "frontend/src/lib/api.ts", "frontend/src/lib/ui-state.ts"],
@@ -844,7 +844,7 @@ export function useUiState(): UIState          // bbox + выбранный кл
           "`tsc --noEmit` и `npm run build` зелёные."],
   forbidden=["Править `frontend/src/client/**` руками — он генерируется.", "Вторая библиотека карт.", "Свои цвета мимо токенов F6."]),
 
- dict(id="F2", name="queue", title="Очередь приоритетов и карточка проблемы", group="FRONTEND", owner="A", backup="D", reviewer="N", branch="pair/frontend",
+ dict(id="F2", name="queue", title="Очередь приоритетов и карточка проблемы", group="FRONTEND", owner="L", backup="A", reviewer="N", branch="pair/frontend",
   depends=["F1", "F6", "B0"], consumers=[],
   goal="Экран оператора: что чинить первым и ПОЧЕМУ. Главный экран для судей по критерию «объяснимость».",
   paths=["frontend/src/features/queue/**", "frontend/src/routes/_layout/queue.tsx"],
@@ -867,7 +867,7 @@ export function PriorityBar(props: { factors: Factor[]; score: number }): JSX.El
           "На 390 px очередь и карточка читаемы без горизонтального скролла."],
   forbidden=["Считать что-либо на фронте — только показывать то, что пришло из API.", "Свои цвета и отступы мимо токенов F6."]),
 
- dict(id="F3", name="dispatch-ui", title="Пульт руководителя: лента оператора, план, утверждение", group="FRONTEND", owner="A", backup="Z", reviewer="N", branch="pair/frontend",
+ dict(id="F3", name="dispatch-ui", title="Пульт руководителя: лента оператора, план, утверждение", group="FRONTEND", owner="A", backup="L", reviewer="N", branch="pair/frontend",
   depends=["F1", "F6", "B0", "B6", "B8"], consumers=[],
   goal="Главный экран демо. Видно, что ИИ-оператор работает сам: лента его действий, собранный им черновик плана с маршрутами, что изменилось при перестройке — и одна кнопка человека «Утвердить и отправить бригадам».",
   paths=["frontend/src/features/dispatch/**", "frontend/src/routes/_layout/plan.tsx"],
@@ -914,7 +914,7 @@ export function ConfirmCard(props: { pending: PendingAction; onDecide: (approve:
           "Ошибка/таймаут API → понятное сообщение в панели, приложение работает дальше."],
   forbidden=["Вызывать LLM из браузера.", "Хранить ключи на фронте."]),
 
- dict(id="F5", name="crew", title="Экран бригады (телефон)", group="FRONTEND", owner="A", backup="Z", reviewer="N", branch="pair/frontend",
+ dict(id="F5", name="crew", title="Экран бригады (телефон)", group="FRONTEND", owner="L", backup="A", reviewer="N", branch="pair/frontend",
   depends=["F1", "F6", "B8"], consumers=[],
   goal="То, чем бригадир пользуется на улице одной рукой: мой маршрут на сегодня, следующая остановка крупно, три кнопки — «Приехал», «Сделано» (с фото), «Не могу» (с причиной).",
   paths=["frontend/src/features/crew/**", "frontend/src/routes/_layout/crew.tsx"],
@@ -939,7 +939,7 @@ export function FailDialog(props: { onSubmit: (reason: JobUpdate["reason"], need
           "После утверждения новой версии плана баннер появляется не позже чем через 10 с."],
   forbidden=["Показывать чужие маршруты и черновики.", "Отдельное мобильное приложение / PWA-обвязка: адаптивный веб."]),
 
- dict(id="F6", name="design", title="Дизайн-система и визуальная полировка", group="FRONTEND", owner="D", backup="A", reviewer="A", branch="pair/frontend",
+ dict(id="F6", name="design", title="Дизайн-система и визуальная полировка", group="FRONTEND", owner="L", backup="A", reviewer="A", branch="pair/frontend",
   depends=["C0"], consumers=["F1", "F2", "F3", "F4", "F5"],
   goal="Единый вид всего приложения. Незамыленный глаз: пройти каждый экран как обычный человек и убрать всё, что непонятно или некрасиво. Только внешний вид — логику не трогать.",
   paths=["frontend/src/index.css", "frontend/src/theme/**", "frontend/src/components/ui/**", "frontend/public/**", "docs/design/**"],
@@ -959,7 +959,7 @@ export function FailDialog(props: { onSubmit: (reason: JobUpdate["reason"], need
           "Каждая категория имеет иконку и подпись RU.",
           "`docs/design/review.md` содержит минимум 10 замечаний со скриншотами; исправления в чужих фичах оформлены как просьбы владельцу, а не правки его файлов."],
   forbidden=["Править файлы в `frontend/src/features/**` и `frontend/src/routes/**`.", "Добавлять запросы к API, состояние, хуки с данными.", "Вторая UI-библиотека."]),
- dict(id="F7", name="citizen", title="Экран жителя (дополнительный)", group="OPTIONAL", owner="A", backup="Z", reviewer="N", branch="pair/frontend",
+ dict(id="F7", name="citizen", title="Экран жителя (дополнительный)", group="OPTIONAL", owner="A", backup="L", reviewer="N", branch="pair/frontend",
   depends=["F1", "F6", "B7", "B1", "X1"], consumers=[],
   goal="Житель строит маршрут, видит проблемы и мероприятия по пути, подтверждает «всё ещё там» и может сообщить о новой проблеме.",
   paths=["frontend/src/features/citizen/**", "frontend/src/routes/_layout/trip.tsx", "frontend/src/routes/_layout/events.tsx", "frontend/src/routes/_layout/report.tsx"],

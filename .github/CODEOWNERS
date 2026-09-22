@@ -1,5 +1,5 @@
 # Двойной статус на merge: одобряет Арсений или Некит (не автор PR).
-# TODO: заменить NEKIT_LOGIN / ZHENYOK_LOGIN / DOROFEY_LOGIN на реальные GitHub-логины.
+# TODO: заменить NEKIT_LOGIN / ZHENYOK_LOGIN / LEO_LOGIN на реальные GitHub-логины.
 *                                @arseniistrokov @NEKIT_LOGIN
 
 # Контракты и общий fixture — только вдвоём

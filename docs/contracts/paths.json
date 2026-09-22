@@ -145,7 +145,7 @@
     "frontend/src/routes/_layout/queue.tsx",
     "docs/contracts/F2_*",
     "docs/status/F2.md",
-    "docs/team/Арсений.md"
+    "docs/team/Лео.md"
   ],
   "F3": [
     "frontend/src/features/dispatch/**",
@@ -165,7 +165,7 @@
     "frontend/src/routes/_layout/crew.tsx",
     "docs/contracts/F5_*",
     "docs/status/F5.md",
-    "docs/team/Арсений.md"
+    "docs/team/Лео.md"
   ],
   "F6": [
     "frontend/src/index.css",
@@ -175,7 +175,7 @@
     "docs/design/**",
     "docs/contracts/F6_*",
     "docs/status/F6.md",
-    "docs/team/Дорофей.md"
+    "docs/team/Лео.md"
   ],
   "F7": [
     "frontend/src/features/citizen/**",

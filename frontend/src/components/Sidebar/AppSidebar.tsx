@@ -51,7 +51,7 @@ export function AppSidebar() {
       <SidebarHeader className="px-4 py-6 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center">
         <Logo variant="responsive" />
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="max-md:[&_[data-slot=sidebar-menu-button]]:min-h-12">
         <Main items={items} />
       </SidebarContent>
       <SidebarFooter>

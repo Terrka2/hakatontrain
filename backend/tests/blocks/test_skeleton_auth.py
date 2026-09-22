@@ -1,6 +1,7 @@
 """C0 auth flow on an isolated in-memory database; no PostgreSQL or SMTP."""
 
 import json
+import socket
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
@@ -16,6 +17,14 @@ from app.core.db import init_db
 from app.main import app
 from app.models import User
 from app.utils import generate_password_reset_token
+
+
+@pytest.fixture(autouse=True)
+def no_external_connections(monkeypatch: pytest.MonkeyPatch) -> None:
+    def blocked(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("C0 offline tests must not open network connections")
+
+    monkeypatch.setattr(socket, "create_connection", blocked)
 
 
 @pytest.fixture
@@ -106,6 +115,7 @@ def test_signup_login_and_password_recovery(auth_client: TestClient) -> None:
 
 
 def test_docs_health_and_optional_routes(auth_client: TestClient) -> None:
+    assert auth_client.post("/api/v1/users/signup", json={}).status_code == 422
     assert auth_client.get("/docs").status_code == 200
     assert auth_client.get("/api/v1/utils/health-check/").status_code == 200
     assert auth_client.post("/api/v1/trips", json={}).status_code == 404

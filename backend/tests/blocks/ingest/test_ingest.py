@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from app.api.deps import get_current_user
 from app.blocks import ingest
 from app.blocks.ingest.l0 import FIXTURE_PATH, reset_store
+from app.contracts.models import GeoPoint
 from app.core.config import settings
 from app.main import app
 from app.models import User
@@ -558,5 +559,246 @@ def test_l1_normalize_raises_clear_value_error() -> None:
                 "text": "   ",
                 "lat": 47.0,
                 "lon": 28.0,
+            }
+        )
+
+
+# ==============================================================================
+# 5. Тесты уровня L2 (Геокодирование через блок B2)
+# ==============================================================================
+
+
+def test_l2_geocoding_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """L2: parse_file геокодирует адреса без координат через app.blocks.geo.geocode."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setenv("INGEST_LEVEL", "l2")
+
+    mock_point = GeoPoint(lat=47.0182, lon=28.8422)
+    monkeypatch.setattr("app.blocks.geo.geocode", lambda addr: mock_point)
+
+    data = [
+        {
+            "id": "l2_1",
+            "category": "pothole",
+            "text": "Яма возле парка",
+            "address": "str. Alexei Mateevici 85, Chișinău",
+        }
+    ]
+    f = tmp_path / "l2_success.json"
+    f.write_text(json.dumps(data), encoding="utf-8")
+
+    result = ingest.parse_file(f)
+    assert len(result.rejected) == 0
+    assert len(result.reports) == 1
+    report = result.reports[0]
+    assert report.id == "l2_1"
+    assert report.location.lat == 47.0182
+    assert report.location.lon == 28.8422
+    assert report.address == "str. Alexei Mateevici 85, Chișinău"
+
+
+def test_l2_geocoding_none_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L2: если geocode вернул None — строка попадает в rejected с причиной 'geocoding_failed'."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setenv("INGEST_LEVEL", "l2")
+
+    monkeypatch.setattr("app.blocks.geo.geocode", lambda addr: None)
+
+    data = [
+        {
+            "id": "l2_none",
+            "category": "garbage",
+            "text": "Мусор не вывезен",
+            "address": "Несуществующий адрес 999",
+        }
+    ]
+    f = tmp_path / "l2_none.json"
+    f.write_text(json.dumps(data), encoding="utf-8")
+
+    result = ingest.parse_file(f)
+    assert len(result.reports) == 0
+    assert len(result.rejected) == 1
+    assert result.rejected[0]["row"] == 1
+    assert result.rejected[0]["reason"] == "geocoding_failed"
+
+
+def test_l2_geocoding_exception_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L2: если geocode выбросил исключение — строка попадает в rejected с причиной 'geocoding_failed'."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setenv("INGEST_LEVEL", "l2")
+
+    def boom(_addr: str) -> Any:
+        raise RuntimeError("Geocoding service unavailable")
+
+    monkeypatch.setattr("app.blocks.geo.geocode", boom)
+
+    data = [
+        {
+            "id": "l2_err",
+            "category": "lighting",
+            "text": "Не горит фонарь",
+            "address": "str. Pushkin 10",
+        }
+    ]
+    f = tmp_path / "l2_err.json"
+    f.write_text(json.dumps(data), encoding="utf-8")
+
+    result = ingest.parse_file(f)
+    assert len(result.reports) == 0
+    assert len(result.rejected) == 1
+    assert result.rejected[0]["row"] == 1
+    assert result.rejected[0]["reason"] == "geocoding_failed"
+
+
+def test_l2_b2_unavailable_fallback_to_l1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L2: если B2 недоступен (ImportError) — тихий откат на L1 без падения импорта."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setenv("INGEST_LEVEL", "l2")
+
+    # Симулируем недоступность B2
+    monkeypatch.setattr("app.blocks.ingest.l2._geocode", None)
+
+    data = [
+        {
+            "id": "valid_with_coords",
+            "category": "pothole",
+            "text": "Яма с координатами",
+            "lat": 47.01,
+            "lon": 28.85,
+        },
+        {
+            "id": "no_coords_only_address",
+            "category": "pothole",
+            "text": "Яма только с адресом",
+            "address": "str. Stefan cel Mare 1",
+        },
+    ]
+    f = tmp_path / "fallback.json"
+    f.write_text(json.dumps(data), encoding="utf-8")
+
+    result = ingest.parse_file(f)
+    assert len(result.reports) == 1
+    assert result.reports[0].id == "valid_with_coords"
+    assert len(result.rejected) == 1
+    assert result.rejected[0]["row"] == 2
+    assert "Missing coordinates" in result.rejected[0]["reason"]
+
+
+def test_l2_use_mock_true_uses_l0(monkeypatch: pytest.MonkeyPatch) -> None:
+    """При USE_MOCK=true — работает L0 даже если указан INGEST_LEVEL=l2."""
+    monkeypatch.setattr(settings, "USE_MOCK", True)
+    monkeypatch.setenv("INGEST_LEVEL", "l2")
+
+    result = ingest.parse_file(FIXTURE_PATH)
+    assert len(result.reports) == 16
+
+
+def test_l2_flag_not_set_uses_l1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """При USE_MOCK=false и без флага L2 — работает L1 (как раньше)."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.delenv("INGEST_LEVEL", raising=False)
+
+    data = [
+        {
+            "id": "r_no_coords",
+            "category": "pothole",
+            "text": "Яма без координат с адресом",
+            "address": "str. Stefan cel Mare 1",
+        }
+    ]
+    f = tmp_path / "l1_check.json"
+    f.write_text(json.dumps(data), encoding="utf-8")
+
+    result = ingest.parse_file(f)
+    assert len(result.reports) == 0
+    assert len(result.rejected) == 1
+    assert "Missing coordinates" in result.rejected[0]["reason"]
+
+
+def test_l2_csv_mixed_geocoding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L2: CSV со смешанными строками: с координатами, с адресом (успех), с адресом (None) и без координат."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setenv("INGEST_LEVEL", "l2")
+
+    def mock_geocode(addr: str) -> GeoPoint | None:
+        if "Valid" in addr:
+            return GeoPoint(lat=47.02, lon=28.83)
+        return None
+
+    monkeypatch.setattr("app.blocks.geo.geocode", mock_geocode)
+
+    csv_content = (
+        "id,category,text,lat,lon,address\n"
+        "r1,pothole,С координатами,47.01,28.84,\n"
+        "r2,garbage,Адрес валидный,,,Str. Valid 10\n"
+        "r3,lighting,Адрес не найден,,,Str. Unknown 99\n"
+        "r4,pothole,Без координат и адреса,,,\n"
+    )
+    f = tmp_path / "mixed.csv"
+    f.write_text(csv_content, encoding="utf-8")
+
+    result = ingest.parse_file(f)
+    assert len(result.reports) == 2
+    ids = [r.id for r in result.reports]
+    assert "r1" in ids
+    assert "r2" in ids
+
+    assert len(result.rejected) == 2
+    rej_reasons = {item["row"]: item["reason"] for item in result.rejected}
+    assert rej_reasons[3] == "geocoding_failed"
+    assert "Missing coordinates" in rej_reasons[4]
+
+
+def test_l2_normalize_direct(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L2: прямое тестирование ingest.l2.normalize."""
+    mock_point = GeoPoint(lat=47.05, lon=28.86)
+    monkeypatch.setattr("app.blocks.geo.geocode", lambda addr: mock_point)
+
+    # 1. Успех геокодирования
+    rep = ingest.l2.normalize(
+        {
+            "id": "norm_1",
+            "category": "pothole",
+            "text": "Текст",
+            "address": "Valid address",
+        }
+    )
+    assert rep.location.lat == 47.05
+    assert rep.location.lon == 28.86
+
+    # 2. Неудача геокодирования (None)
+    monkeypatch.setattr("app.blocks.geo.geocode", lambda addr: None)
+    with pytest.raises(ValueError, match="geocoding_failed"):
+        ingest.l2.normalize(
+            {
+                "id": "norm_2",
+                "category": "pothole",
+                "text": "Текст",
+                "address": "Unknown address",
+            }
+        )
+
+    # 3. Исключение геокодера
+    def err_geocode(_addr: str) -> Any:
+        raise ConnectionError("Network down")
+
+    monkeypatch.setattr("app.blocks.geo.geocode", err_geocode)
+    with pytest.raises(ValueError, match="geocoding_failed"):
+        ingest.l2.normalize(
+            {
+                "id": "norm_3",
+                "category": "pothole",
+                "text": "Текст",
+                "address": "Failing address",
             }
         )

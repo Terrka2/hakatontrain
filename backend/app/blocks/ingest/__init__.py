@@ -1,17 +1,19 @@
 """Блок B1 · Парсер и импорт обращений. Порт блока — только то, что объявлено в этом файле.
 
-Контракт: docs/contracts/B1_ingest.md. Реализация: l0.py (без сети, fixture), l1.py (целевой уровень).
+Контракт: docs/contracts/B1_ingest.md. Реализация: l0.py (без сети, fixture), l1.py (парсер/маппинг), l2.py (геокодирование B2).
 """
 
 import logging
+import os
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 
 from app.contracts.models import Report
 from app.core.config import settings
 
-from . import l0, l1
+from . import l0, l1, l2
 
 log = logging.getLogger(__name__)
 
@@ -27,10 +29,24 @@ def load_fixture() -> list[Report]:
 
 
 def parse_file(path: Path, mapping: dict[str, str] | None = None) -> IngestResult:
-    """Парсинг файла (CSV/JSON). При USE_MOCK или ошибке L1 — тихий откат на L0."""
+    """Парсинг файла (CSV/JSON).
+
+    При USE_MOCK=true -> L0;
+    При INGEST_LEVEL=l2 -> L2 (с откатом на L1 и L0);
+    По умолчанию (USE_MOCK=false) -> L1 (с откатом на L0).
+    """
     if settings.USE_MOCK:
         reports, rejected = l0.parse_file(path, mapping)
         return IngestResult(reports=reports, rejected=rejected)
+
+    level = os.getenv("INGEST_LEVEL", "l1").strip().lower()
+    if level in ("l2", "2"):
+        try:
+            reports, rejected = l2.parse_file(path, mapping)
+            return IngestResult(reports=reports, rejected=rejected)
+        except Exception:  # noqa: BLE001
+            log.warning("B1: L2 parse_file failed, falling back to L1", exc_info=True)
+
     try:
         reports, rejected = l1.parse_file(path, mapping)
         return IngestResult(reports=reports, rejected=rejected)
@@ -40,12 +56,25 @@ def parse_file(path: Path, mapping: dict[str, str] | None = None) -> IngestResul
         return IngestResult(reports=reports, rejected=rejected)
 
 
-def normalize(raw: dict[str, object], mapping: dict[str, str]) -> Report:
-    """Приведение сырой строки к Report. При USE_MOCK или ошибке L1 — тихий откат на L0."""
+def normalize(raw: dict[str, Any], mapping: dict[str, str] | None = None) -> Report:
+    """Приведение сырой строки к Report.
+
+    При USE_MOCK=true -> L0;
+    При INGEST_LEVEL=l2 -> L2 (с откатом на L1 и L0);
+    По умолчанию (USE_MOCK=false) -> L1 (с откатом на L0).
+    """
     if settings.USE_MOCK:
-        return l0.normalize(raw, mapping)
+        return l0.normalize(raw, mapping or {})
+
+    level = os.getenv("INGEST_LEVEL", "l1").strip().lower()
+    if level in ("l2", "2"):
+        try:
+            return l2.normalize(raw, mapping)
+        except Exception:  # noqa: BLE001
+            log.warning("B1: L2 normalize failed, falling back to L1", exc_info=True)
+
     try:
         return l1.normalize(raw, mapping)
     except Exception:  # noqa: BLE001
         log.warning("B1: L1 normalize failed, falling back to L0", exc_info=True)
-        return l0.normalize(raw, mapping)
+        return l0.normalize(raw, mapping or {})

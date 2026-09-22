@@ -57,14 +57,26 @@ export function routeFeatures(
   return { type: "FeatureCollection", features }
 }
 
-/** oklch-токены maplibre не понимает: переводим через canvas в rgb. Вне браузера — прозрачный. */
+/** oklch-токены maplibre не понимает: рисуем пиксель на canvas и читаем его как rgb. Вне браузера — прозрачный. */
+const colorCache = new Map<string, string>()
 export function resolveCssColor(varName: string): string {
   if (typeof document === "undefined") return "transparent"
   const raw = getComputedStyle(document.documentElement)
     .getPropertyValue(varName)
     .trim()
-  const ctx = document.createElement("canvas").getContext("2d")
-  if (!ctx || !raw) return "transparent"
+  if (!raw) return "transparent"
+  const key = `${varName}:${raw}`
+  const hit = colorCache.get(key)
+  if (hit) return hit
+  const canvas = document.createElement("canvas")
+  canvas.width = 1
+  canvas.height = 1
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })
+  if (!ctx) return "transparent"
   ctx.fillStyle = raw
-  return String(ctx.fillStyle)
+  ctx.fillRect(0, 0, 1, 1)
+  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
+  const rgb = `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(2)})`
+  colorCache.set(key, rgb)
+  return rgb
 }

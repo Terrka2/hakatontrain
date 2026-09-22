@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { ErrorState } from "@/components/ui/ErrorState"
 import { Skeleton } from "@/components/ui/skeleton"
+import { AssistantDrawer } from "@/features/assistant"
 import { CityMap, useClusters } from "@/features/map"
 import useAuth from "@/hooks/useAuth"
 import { USE_MOCK } from "@/lib/api"
@@ -211,6 +212,7 @@ export function DispatchScreen() {
           )}
         </>
       )}
+      <AssistantDrawer />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useCallback } from "react"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { ErrorState } from "@/components/ui/ErrorState"
 import { Skeleton } from "@/components/ui/skeleton"
+import { AssistantDrawer } from "@/features/assistant"
 import { setUiState, useUiState } from "@/lib/ui-state"
 import { cn } from "@/lib/utils"
 import { PRIORITY } from "@/theme/priority"
@@ -106,6 +107,7 @@ export function MapScreen() {
           {panel}
         </aside>
       )}
+      <AssistantDrawer />
     </div>
   )
 }

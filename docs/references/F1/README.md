@@ -24,8 +24,7 @@ export function useUiState(): UIState          // bbox + выбранный кл
 ## Куда смотреть в каркасе
 - `frontend/src/features/map/**`
 - `frontend/src/routes/_layout/index.tsx`
-- `frontend/src/lib/api.ts`
-- `frontend/src/lib/ui-state.ts`
+- `frontend/src/lib/**`
 
 ## Данные для тестов
 Только `backend/app/fixtures/demo_city.json` (фронт — `frontend/src/mocks/demo_city.json`, копия). Эталон — раздел `expect`. Критерии приёмки, которые должны стать тестами:

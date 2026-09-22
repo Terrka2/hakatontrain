@@ -4,7 +4,6 @@
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -32,15 +31,14 @@ def parse_file(path: Path, mapping: dict[str, str] | None = None) -> IngestResul
     """Парсинг файла (CSV/JSON).
 
     При USE_MOCK=true -> L0;
-    При INGEST_LEVEL=l2 -> L2 (с откатом на L1 и L0);
-    По умолчанию (USE_MOCK=false) -> L1 (с откатом на L0).
+    Иначе если доступен geocoder B2 -> L2 (с откатом на L1 и L0);
+    Иначе -> L1 (с откатом на L0).
     """
     if settings.USE_MOCK:
         reports, rejected = l0.parse_file(path, mapping)
         return IngestResult(reports=reports, rejected=rejected)
 
-    level = os.getenv("INGEST_LEVEL", "l1").strip().lower()
-    if level in ("l2", "2"):
+    if l2.is_geocoder_available():
         try:
             reports, rejected = l2.parse_file(path, mapping)
             return IngestResult(reports=reports, rejected=rejected)
@@ -60,14 +58,13 @@ def normalize(raw: dict[str, Any], mapping: dict[str, str] | None = None) -> Rep
     """Приведение сырой строки к Report.
 
     При USE_MOCK=true -> L0;
-    При INGEST_LEVEL=l2 -> L2 (с откатом на L1 и L0);
-    По умолчанию (USE_MOCK=false) -> L1 (с откатом на L0).
+    Иначе если доступен geocoder B2 -> L2 (с откатом на L1 и L0);
+    Иначе -> L1 (с откатом на L0).
     """
     if settings.USE_MOCK:
         return l0.normalize(raw, mapping or {})
 
-    level = os.getenv("INGEST_LEVEL", "l1").strip().lower()
-    if level in ("l2", "2"):
+    if l2.is_geocoder_available():
         try:
             return l2.normalize(raw, mapping)
         except Exception:  # noqa: BLE001

@@ -1,32 +1,16 @@
 """L0: детерминированно, без сети, без ключей, без базы. Работает на fixture demo_city.json."""
 
 import csv
+import hashlib
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
-from uuid import uuid4
 
 from app.contracts.models import CATEGORIES, GeoPoint, Report
 
 FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "demo_city.json"
-
-_store: dict[str, Report] | None = None
-
-
-def get_store() -> dict[str, Report]:
-    """Возвращает in-memory реестр обращений, инициализированный из fixture."""
-    global _store
-    if _store is None:
-        reports = load_fixture()
-        _store = {r.id: r for r in reports}
-    return _store
-
-
-def reset_store() -> None:
-    """Сбрасывает in-memory реестр для изоляции тестов."""
-    global _store
-    _store = None
 
 
 def load_fixture() -> list[Report]:
@@ -35,69 +19,124 @@ def load_fixture() -> list[Report]:
     return [Report(**r) for r in raw["reports"]]
 
 
-def normalize(raw: dict[str, Any], mapping: dict[str, str]) -> Report:
-    """Нормализует сырую запись в Report с применением mapping.
+def _extract_location(
+    mapped: dict[str, Any],
+    *,
+    allow_geocoding: bool = False,
+    geocode_fn: Callable[[str], GeoPoint | None] | None = None,
+) -> GeoPoint:
+    """Извлекает и валидирует координаты из mapped словаря."""
+    loc = mapped.get("location")
+    if isinstance(loc, GeoPoint):
+        return loc
+    if isinstance(loc, dict):
+        lat = loc.get("lat")
+        lon = loc.get("lon")
+        if (
+            lat is not None
+            and lon is not None
+            and not (isinstance(lat, str) and not lat.strip())
+            and not (isinstance(lon, str) and not lon.strip())
+        ):
+            try:
+                lat_f = float(lat)
+                lon_f = float(lon)
+                if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
+                    raise ValueError(
+                        f"Coordinates out of bounds: lat={lat_f}, lon={lon_f}"
+                    )
+                return GeoPoint(lat=lat_f, lon=lon_f)
+            except (ValueError, TypeError) as e:
+                if not allow_geocoding:
+                    raise ValueError(
+                        f"Invalid coordinate format: lat={lat}, lon={lon}"
+                    ) from e
+        elif not allow_geocoding:
+            raise ValueError("Missing coordinates: lat and lon required in location")
 
-    Бросает ValueError с понятной причиной при невалидных данных.
-    """
+    lat = mapped.get("lat")
+    lon = mapped.get("lon")
+    if (
+        lat is not None
+        and lon is not None
+        and not (isinstance(lat, str) and not lat.strip())
+        and not (isinstance(lon, str) and not lon.strip())
+    ):
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+            if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
+                raise ValueError(f"Coordinates out of bounds: lat={lat_f}, lon={lon_f}")
+            return GeoPoint(lat=lat_f, lon=lon_f)
+        except (ValueError, TypeError) as e:
+            if not allow_geocoding:
+                raise ValueError(
+                    f"Invalid coordinate format: lat={lat}, lon={lon}"
+                ) from e
+
+    # Если координат нет, пробуем геокодирование адреса (для L2)
+    if allow_geocoding:
+        raw_address = mapped.get("address")
+        address = (
+            str(raw_address).strip()
+            if raw_address is not None and str(raw_address).strip()
+            else None
+        )
+        if not address:
+            raise ValueError("Missing coordinates: lat and lon required")
+        if geocode_fn is None:
+            raise ImportError("B2 geocode port is not available")
+        try:
+            geocoded_loc = geocode_fn(address)
+        except Exception as e:
+            raise ValueError("geocoding_failed") from e
+        if geocoded_loc is None or not isinstance(geocoded_loc, GeoPoint):
+            raise ValueError("geocoding_failed")
+        return geocoded_loc
+
+    raise ValueError("Missing coordinates: lat and lon required")
+
+
+def _build_report(
+    raw: dict[str, Any],
+    mapping: dict[str, str] | None = None,
+    *,
+    category_resolver: Callable[[Any], str] | None = None,
+    allow_geocoding: bool = False,
+    geocode_fn: Callable[[str], GeoPoint | None] | None = None,
+) -> Report:
+    """Общий хелпер построения Report из сырой строки с применением mapping."""
+    map_dict = mapping or {}
     mapped: dict[str, Any] = {
-        (mapping.get(k.strip(), k.strip()) if isinstance(k, str) else k): (
+        (map_dict.get(k.strip(), k.strip()) if isinstance(k, str) else k): (
             v.strip() if isinstance(v, str) else v
         )
         for k, v in raw.items()
     }
 
-    cat = mapped.get("category")
-    if isinstance(cat, str):
-        cat = cat.strip().lower()
-    if not cat or cat not in CATEGORIES:
-        raise ValueError(f"Unknown or missing category: {cat}")
-
-    loc = mapped.get("location")
-    if isinstance(loc, GeoPoint):
-        location = loc
-    elif isinstance(loc, dict):
-        lat = loc.get("lat")
-        lon = loc.get("lon")
-        if (
-            lat is None
-            or lon is None
-            or (isinstance(lat, str) and not lat.strip())
-            or (isinstance(lon, str) and not lon.strip())
-        ):
-            raise ValueError("Missing coordinates: lat and lon required in location")
-        try:
-            lat_f = float(lat)
-            lon_f = float(lon)
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"Invalid coordinate format: lat={lat}, lon={lon}") from e
-        if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
-            raise ValueError(f"Coordinates out of bounds: lat={lat_f}, lon={lon_f}")
-        location = GeoPoint(lat=lat_f, lon=lon_f)
+    # Валидация категории
+    raw_cat = mapped.get("category")
+    if category_resolver is not None:
+        cat = category_resolver(raw_cat)
     else:
-        lat = mapped.get("lat")
-        lon = mapped.get("lon")
-        if (
-            lat is None
-            or lon is None
-            or (isinstance(lat, str) and not lat.strip())
-            or (isinstance(lon, str) and not lon.strip())
-        ):
-            raise ValueError("Missing coordinates: lat and lon required")
-        try:
-            lat_f = float(lat)
-            lon_f = float(lon)
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"Invalid coordinate format: lat={lat}, lon={lon}") from e
-        if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
-            raise ValueError(f"Coordinates out of bounds: lat={lat_f}, lon={lon_f}")
-        location = GeoPoint(lat=lat_f, lon=lon_f)
+        if isinstance(raw_cat, str):
+            raw_cat = raw_cat.strip().lower()
+        if not raw_cat or raw_cat not in CATEGORIES:
+            raise ValueError(f"Unknown or missing category: {raw_cat}")
+        cat = raw_cat
 
+    # Координаты
+    location = _extract_location(
+        mapped, allow_geocoding=allow_geocoding, geocode_fn=geocode_fn
+    )
+
+    # Текст
     text = mapped.get("text")
     if not text or not str(text).strip():
         raise ValueError("Missing or empty report text")
     text_str = str(text).strip()
 
+    # created_at (строго timezone-aware UTC)
     created_at_val = mapped.get("created_at")
     if isinstance(created_at_val, datetime):
         created_at = created_at_val
@@ -109,13 +148,19 @@ def normalize(raw: dict[str, Any], mapping: dict[str, str]) -> Report:
     else:
         created_at = datetime.now(UTC)
 
-    raw_id = mapped.get("id")
-    report_id = (
-        str(raw_id).strip()
-        if raw_id and str(raw_id).strip()
-        else f"r_{uuid4().hex[:8]}"
-    )
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
 
+    # id (стабильный MD5 хеш, если не задан)
+    raw_id = mapped.get("id")
+    if raw_id and str(raw_id).strip():
+        report_id = str(raw_id).strip()
+    else:
+        report_id = hashlib.md5(
+            f"{text_str}{location.lat}{location.lon}{created_at}".encode()
+        ).hexdigest()[:12]
+
+    # status
     status_val = mapped.get("status")
     status: Literal["open", "in_progress", "resolved", "rejected"] = (
         status_val
@@ -123,6 +168,7 @@ def normalize(raw: dict[str, Any], mapping: dict[str, str]) -> Report:
         else "open"
     )
 
+    # confirmations
     confirmations_val = mapped.get("confirmations", 0)
     try:
         confirmations = int(confirmations_val)
@@ -154,15 +200,15 @@ def normalize(raw: dict[str, Any], mapping: dict[str, str]) -> Report:
     )
 
 
-def parse_file(
-    path: Path, mapping: dict[str, str] | None = None
+def _parse_file_with_normalizer(
+    path: Path,
+    normalize_fn: Callable[[dict[str, Any]], Report],
 ) -> tuple[list[Report], list[dict[str, Any]]]:
-    """Парсит файл (CSV/JSON), возвращая (reports, rejected).
+    """Общий хелпер парсинга файлов CSV/JSON."""
+    suffix = path.suffix.lower()
+    if suffix not in (".json", ".csv"):
+        return [], [{"row": 0, "reason": "unsupported_file_format"}]
 
-    Повторные записи с одинаковым id не создают дубликатов.
-    Невалидные строки добавляются в rejected с номером строки и причиной.
-    """
-    map_dict = mapping or {}
     reports: list[Report] = []
     rejected: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
@@ -173,14 +219,11 @@ def parse_file(
                 if r.id not in seen_ids:
                     seen_ids.add(r.id)
                     reports.append(r)
-            return reports, rejected
         return reports, rejected
 
     content = path.read_text(encoding="utf-8").strip()
     if not content:
         return reports, rejected
-
-    suffix = path.suffix.lower()
 
     if suffix == ".json":
         try:
@@ -203,7 +246,7 @@ def parse_file(
                 rejected.append({"row": idx, "reason": "Item must be a JSON object"})
                 continue
             try:
-                report = normalize(item, map_dict)
+                report = normalize_fn(item)
                 if report.id in seen_ids:
                     continue
                 seen_ids.add(report.id)
@@ -215,7 +258,7 @@ def parse_file(
         reader = csv.DictReader(content.splitlines())
         for idx, row in enumerate(reader, start=1):
             try:
-                report = normalize(row, map_dict)
+                report = normalize_fn(row)
                 if report.id in seen_ids:
                     continue
                 seen_ids.add(report.id)
@@ -223,11 +266,17 @@ def parse_file(
             except ValueError as e:
                 rejected.append({"row": idx, "reason": str(e)})
 
-    else:
-        # Fallback для неопознанного расширения
-        for r in load_fixture():
-            if r.id not in seen_ids:
-                seen_ids.add(r.id)
-                reports.append(r)
-
     return reports, rejected
+
+
+def normalize(raw: dict[str, Any], mapping: dict[str, str]) -> Report:
+    """Нормализует сырую запись в Report с применением mapping."""
+    return _build_report(raw, mapping)
+
+
+def parse_file(
+    path: Path, mapping: dict[str, str] | None = None
+) -> tuple[list[Report], list[dict[str, Any]]]:
+    """Парсит файл (CSV/JSON), возвращая (reports, rejected)."""
+    map_dict = mapping or {}
+    return _parse_file_with_normalizer(path, lambda row: normalize(row, map_dict))

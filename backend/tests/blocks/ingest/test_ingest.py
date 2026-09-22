@@ -15,19 +15,51 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user
 from app.blocks import ingest
-from app.blocks.ingest.l0 import FIXTURE_PATH, reset_store
-from app.contracts.models import GeoPoint
+from app.blocks.ingest.l0 import FIXTURE_PATH
+from app.contracts.models import GeoPoint, Report
 from app.core.config import settings
+from app.db import get_repository
 from app.main import app
 from app.models import User
 
 
+class MockRepository:
+    def __init__(self, initial_reports: list[Report] | None = None) -> None:
+        self._reports: dict[str, Report] = {}
+        if initial_reports:
+            for r in initial_reports:
+                self._reports[r.id] = r.model_copy(deep=True)
+
+    def list_reports(
+        self, *, status: str | None = None, category: str | None = None
+    ) -> list[Report]:
+        res = list(self._reports.values())
+        if status:
+            res = [r for r in res if r.status == status]
+        if category:
+            res = [r for r in res if r.category == category]
+        return res
+
+    def upsert_reports(self, reports: list[Report]) -> int:
+        for r in reports:
+            self._reports[r.id] = r
+        return len(reports)
+
+    def confirm_report(self, report_id: str) -> Report:
+        if report_id not in self._reports:
+            raise KeyError(f"Report {report_id} not found")
+        rep = self._reports[report_id]
+        rep.confirmations += 1
+        return rep
+
+
 @pytest.fixture(autouse=True)
-def clean_environment() -> Generator[None]:
-    """Сбрасывает in-memory хранилище обращений до и после каждого теста."""
-    reset_store()
-    yield
-    reset_store()
+def clean_environment() -> Generator[MockRepository]:
+    """Предоставляет изолированный MockRepository через get_repository."""
+    repo = MockRepository(ingest.load_fixture())
+    app.dependency_overrides[get_repository] = lambda: repo
+    yield repo
+    app.dependency_overrides.pop(get_repository, None)
 
 
 @pytest.fixture(autouse=True)
@@ -254,24 +286,25 @@ def test_route_get_reports_and_filters(client: TestClient) -> None:
 def test_route_create_report_sets_unverified(client: TestClient) -> None:
     """POST /reports создаёт обращение с verification.status='unverified'."""
     new_report_payload = {
-        "id": "citizen_new_1",
-        "source": "citizen",
         "category": "pothole",
         "text": "Яма возле подъезда",
-        "location": {"lat": 47.02, "lon": 28.85},
-        "created_at": datetime.now(UTC).isoformat(),
-        "status": "open",
+        "lat": 47.02,
+        "lon": 28.85,
     }
     response = client.post("/api/v1/reports", json=new_report_payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == "citizen_new_1"
+    assert len(data["id"]) == 12
+    assert data["category"] == "pothole"
+    assert data["status"] == "open"
     assert data["verification"]["status"] == "unverified"
+    assert data["location"]["lat"] == 47.02
+    assert data["location"]["lon"] == 28.85
 
     # Проверяем, что появилось в GET /reports
     get_res = client.get("/api/v1/reports")
-    ids = [r["id"] for r in get_res.json()]
-    assert "citizen_new_1" in ids
+    texts = [r["text"] for r in get_res.json()]
+    assert "Яма возле подъезда" in texts
 
 
 def test_route_confirm_report_increments_confirmations(client: TestClient) -> None:
@@ -571,7 +604,6 @@ def test_l1_normalize_raises_clear_value_error() -> None:
 def test_l2_geocoding_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """L2: parse_file геокодирует адреса без координат через app.blocks.geo.geocode."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
-    monkeypatch.setenv("INGEST_LEVEL", "l2")
 
     mock_point = GeoPoint(lat=47.0182, lon=28.8422)
     monkeypatch.setattr("app.blocks.geo.geocode", lambda addr: mock_point)
@@ -602,7 +634,6 @@ def test_l2_geocoding_none_rejected(
 ) -> None:
     """L2: если geocode вернул None — строка попадает в rejected с причиной 'geocoding_failed'."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
-    monkeypatch.setenv("INGEST_LEVEL", "l2")
 
     monkeypatch.setattr("app.blocks.geo.geocode", lambda addr: None)
 
@@ -629,7 +660,6 @@ def test_l2_geocoding_exception_rejected(
 ) -> None:
     """L2: если geocode выбросил исключение — строка попадает в rejected с причиной 'geocoding_failed'."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
-    monkeypatch.setenv("INGEST_LEVEL", "l2")
 
     def boom(_addr: str) -> Any:
         raise RuntimeError("Geocoding service unavailable")
@@ -659,7 +689,6 @@ def test_l2_b2_unavailable_fallback_to_l1(
 ) -> None:
     """L2: если B2 недоступен (ImportError) — тихий откат на L1 без падения импорта."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
-    monkeypatch.setenv("INGEST_LEVEL", "l2")
 
     # Симулируем недоступность B2
     monkeypatch.setattr("app.blocks.ingest.l2._geocode", None)
@@ -691,9 +720,11 @@ def test_l2_b2_unavailable_fallback_to_l1(
 
 
 def test_l2_use_mock_true_uses_l0(monkeypatch: pytest.MonkeyPatch) -> None:
-    """При USE_MOCK=true — работает L0 даже если указан INGEST_LEVEL=l2."""
+    """При USE_MOCK=true — работает L0 даже если доступен геокодер."""
     monkeypatch.setattr(settings, "USE_MOCK", True)
-    monkeypatch.setenv("INGEST_LEVEL", "l2")
+    monkeypatch.setattr(
+        "app.blocks.geo.geocode", lambda addr: GeoPoint(lat=47.0, lon=28.0)
+    )
 
     result = ingest.parse_file(FIXTURE_PATH)
     assert len(result.reports) == 16
@@ -702,9 +733,8 @@ def test_l2_use_mock_true_uses_l0(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_l2_flag_not_set_uses_l1(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """При USE_MOCK=false и без флага L2 — работает L1 (как раньше)."""
+    """При USE_MOCK=false и без доступного geocoder B2 — работает L1 (как раньше)."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
-    monkeypatch.delenv("INGEST_LEVEL", raising=False)
 
     data = [
         {
@@ -728,7 +758,6 @@ def test_l2_csv_mixed_geocoding(
 ) -> None:
     """L2: CSV со смешанными строками: с координатами, с адресом (успех), с адресом (None) и без координат."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
-    monkeypatch.setenv("INGEST_LEVEL", "l2")
 
     def mock_geocode(addr: str) -> GeoPoint | None:
         if "Valid" in addr:
@@ -802,3 +831,59 @@ def test_l2_normalize_direct(monkeypatch: pytest.MonkeyPatch) -> None:
                 "address": "Failing address",
             }
         )
+
+
+def test_parse_file_unsupported_extensions(tmp_path: Path) -> None:
+    """Неизвестные расширения файлов (.txt, .xml, etc.) возвращают rejected unsupported_file_format."""
+    txt_file = tmp_path / "reports.txt"
+    txt_file.write_text("random content", encoding="utf-8")
+    res = ingest.parse_file(txt_file)
+    assert len(res.reports) == 0
+    assert len(res.rejected) == 1
+    assert res.rejected[0]["row"] == 0
+    assert res.rejected[0]["reason"] == "unsupported_file_format"
+
+    xml_file = tmp_path / "reports.xml"
+    xml_file.write_text("<xml></xml>", encoding="utf-8")
+    res_xml = ingest.parse_file(xml_file)
+    assert len(res_xml.reports) == 0
+    assert len(res_xml.rejected) == 1
+    assert res_xml.rejected[0]["row"] == 0
+    assert res_xml.rejected[0]["reason"] == "unsupported_file_format"
+
+
+def test_naive_datetime_converted_to_timezone_aware_utc() -> None:
+    """created_at без таймзоны (naive) автоматически преобразуется в timezone-aware UTC."""
+    rep = ingest.normalize(
+        {
+            "id": "r_naive",
+            "category": "pothole",
+            "text": "Яма с naive datetime",
+            "lat": 47.01,
+            "lon": 28.85,
+            "created_at": "2026-09-22T10:30:00",
+        }
+    )
+    assert rep.created_at.tzinfo is not None
+    assert rep.created_at.utcoffset() == datetime.now(UTC).utcoffset()
+
+
+def test_stable_id_generation_when_missing() -> None:
+    """При отсутствии id генерируется детерминированный стабильный MD5-хеш (12 символов)."""
+    raw_data = {
+        "category": "pothole",
+        "text": "Обращение без ID",
+        "lat": 47.01,
+        "lon": 28.85,
+        "created_at": "2026-09-22T12:00:00+00:00",
+    }
+    r1 = ingest.normalize(raw_data)
+    r2 = ingest.normalize(raw_data)
+    assert len(r1.id) == 12
+    assert r1.id == r2.id
+    import hashlib
+
+    expected_hash = hashlib.md5(
+        f"Обращение без ID47.0128.85{r1.created_at}".encode()
+    ).hexdigest()[:12]
+    assert r1.id == expected_hash

@@ -19,6 +19,7 @@ FIXTURE_PATH = (
 @pytest.fixture(autouse=True)
 def _reset_context_state() -> None:
     context.reset_scenario()
+    context.clear_cache()
 
 
 @pytest.fixture(scope="module")
@@ -217,3 +218,89 @@ def test_no_network_allowed(
     assert ctx is not None
     kept, _ = context.apply_weather_rules(sample_jobs, ctx.weather)
     assert len(kept) == len(sample_jobs)
+
+
+def test_l1_open_meteo_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L1: Open-Meteo возвращает Weather с source='open-meteo' при 200 OK."""
+    monkeypatch.setattr(settings, "WEATHER", "open-meteo")
+
+    def mock_get(*_args: object, **_kwargs: object) -> httpx.Response:
+        content = json.dumps(
+            {
+                "current": {
+                    "precipitation": 2.5,
+                    "wind_speed_10m": 8.0,
+                    "temperature_2m": 19.5,
+                }
+            }
+        ).encode("utf-8")
+        return httpx.Response(
+            200,
+            content=content,
+            request=httpx.Request("GET", "https://api.open-meteo.com"),
+        )
+
+    monkeypatch.setattr(httpx.Client, "get", mock_get)
+    point = GeoPoint(lat=47.018, lon=28.842)
+    at = datetime(2026, 9, 26, 8, 0, tzinfo=UTC)
+    weather = context.get_weather(point, at)
+    assert weather is not None
+    assert weather.source == "open-meteo"
+    assert weather.precipitation_mm == 2.5
+    assert weather.wind_ms == 8.0
+    assert weather.temp_c == 19.5
+
+
+def test_l1_open_meteo_error_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L1: При ошибке подключения происходит тихий откат на fixture."""
+    monkeypatch.setattr(settings, "WEATHER", "open-meteo")
+
+    def mock_get(*_args: object, **_kwargs: object) -> httpx.Response:
+        raise httpx.ConnectError("Connection refused")
+
+    monkeypatch.setattr(httpx.Client, "get", mock_get)
+    weather = context.get_weather(GeoPoint(lat=47.018, lon=28.842), datetime.now(UTC))
+    assert weather is not None
+    assert weather.source == "fixture"
+
+
+def test_l1_cache_hit_avoids_http_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L1: Повторный запрос в пределах 30 минут берётся из кэша без нового HTTP-вызова."""
+    monkeypatch.setattr(settings, "WEATHER", "open-meteo")
+    calls = 0
+
+    def mock_get(*_args: object, **_kwargs: object) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        content = json.dumps(
+            {
+                "current": {
+                    "precipitation": 1.0,
+                    "wind_speed_10m": 5.0,
+                    "temperature_2m": 20.0,
+                }
+            }
+        ).encode("utf-8")
+        return httpx.Response(
+            200,
+            content=content,
+            request=httpx.Request("GET", "https://api.open-meteo.com"),
+        )
+
+    monkeypatch.setattr(httpx.Client, "get", mock_get)
+    point = GeoPoint(lat=47.018, lon=28.842)
+    w1 = context.get_weather(point, datetime.now(UTC))
+    assert calls == 1
+    assert w1 is not None and w1.source == "open-meteo"
+
+    # Второй вызов с теми же координатами не делает повторный запрос
+    w2 = context.get_weather(point, datetime.now(UTC))
+    assert calls == 1
+    assert w2 is not None and w2.source == "open-meteo"
+    assert w1.precipitation_mm == w2.precipitation_mm
+
+    # Вызов с другими координатами делает новый запрос
+    point_other = GeoPoint(lat=47.050, lon=28.890)
+    w3 = context.get_weather(point_other, datetime.now(UTC))
+    assert calls == 2
+    assert w3 is not None and w3.source == "open-meteo"

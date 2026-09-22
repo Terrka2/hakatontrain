@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from app.contracts.models import Context, Decision, GeoPoint, InfraObject, Job, Weather
 from app.core.config import settings

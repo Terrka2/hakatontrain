@@ -51,8 +51,7 @@
 Можно создавать и менять ТОЛЬКО эти файлы:
 - `frontend/src/features/map/**`
 - `frontend/src/routes/_layout/index.tsx`
-- `frontend/src/lib/api.ts`
-- `frontend/src/lib/ui-state.ts`
+- `frontend/src/lib/**`
 - `docs/status/F1.md` — доска задач блока
 
 ## Порт (что блок обязан предоставить)

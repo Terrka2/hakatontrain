@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
 from pydantic.networks import EmailStr
 
-from app.api.deps import get_current_active_superuser
+from app.api.deps import get_current_active_superuser, require_roles
+from app.db import get_repository
 from app.models import Message
 from app.utils import generate_test_email, send_email
 
@@ -29,3 +30,11 @@ def test_email(email_to: EmailStr) -> Message:
 @router.get("/health-check/")
 async def health_check() -> bool:
     return True
+
+
+@router.post("/reset", dependencies=[Depends(require_roles("supervisor"))])
+def reset_environment() -> dict[str, str]:
+    """Сбросить репозиторий к состоянию demo_city.json (снятие блокера D1)."""
+    repo = get_repository()
+    repo.reset()
+    return {"status": "ok"}

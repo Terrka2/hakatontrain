@@ -5,7 +5,7 @@
 
 import logging
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, cast
 
 from app.contracts.models import (
     Cluster,
@@ -57,7 +57,7 @@ def get_repository() -> Repository:
     if settings.USE_MOCK:
         return l0.repo
     try:
-        return l1.repo
+        return cast(Repository, l1.repo)
     except Exception:  # noqa: BLE001 — любая ошибка L1 = тихий откат на L0, не падение
         log.warning("D1: L1 failed, falling back to L0", exc_info=True)
         return l0.repo

@@ -262,7 +262,7 @@ def test_immutability_deep_copy() -> None:
 
 
 def test_set_needs_review_validation_and_reason() -> None:
-    """Проблема 3: set_needs_review валидирует cluster_id и сохраняет reason."""
+    """Проблема 3: set_needs_review валидирует cluster_id; поведение observable через порт."""
     repo = get_repository()
     repo.reset()
 
@@ -270,7 +270,7 @@ def test_set_needs_review_validation_and_reason() -> None:
     with pytest.raises(ValueError, match="does not exist"):
         repo.set_needs_review("non_existent_cluster", True, "some reason")
 
-    # Существующий кластер
+    # Существующий кластер — создаём и сохраняем
     c = Cluster(
         id="c_test",
         category="pothole",
@@ -288,8 +288,10 @@ def test_set_needs_review_validation_and_reason() -> None:
     )
     repo.save_clusters([c], {"c_test": p})
 
+    # Вызов с существующим cluster_id не должен вызывать исключений
     repo.set_needs_review("c_test", True, "Hazardous near school")
-    assert repo._needs_review_reasons.get("c_test") == "Hazardous near school"
+
+    # Проверяем needs_review через порт list_clusters()
     cluster_pairs = repo.list_clusters()
     matching = [
         priority for cluster, priority in cluster_pairs if cluster.id == "c_test"

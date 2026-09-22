@@ -3,6 +3,7 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import get_args
 
 from app.contracts.models import (
     Cluster,
@@ -13,6 +14,7 @@ from app.contracts.models import (
     Plan,
     Priority,
     Report,
+    RouteStop,
 )
 
 FIXTURE_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "demo_city.json"
@@ -180,13 +182,18 @@ class MemoryRepository:
         return matching[0].model_copy(deep=True)
 
     def set_stop_status(self, plan_id: str, job_id: str, status: str) -> None:
+        _valid: tuple[str, ...] = get_args(
+            RouteStop.model_fields["status"].annotation
+        ) or ("pending", "arrived", "done", "failed")
+        if status not in _valid:
+            raise ValueError(f"Invalid status: {status!r}. Expected one of {_valid}")
         plan = self._plans.get(plan_id)
         if not plan:
             return
         for route in plan.routes:
             for stop in route.stops:
                 if stop.job_id == job_id:
-                    stop.status = status
+                    stop.status = status  # type: ignore[assignment]
 
     def add_run(self, run: OperatorRun) -> None:
         self._runs.append(run.model_copy(deep=True))

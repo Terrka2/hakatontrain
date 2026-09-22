@@ -1,0 +1,168 @@
+# B4 · Объяснимый приоритет
+
+> **Контракт блока.** Вставь этот файл целиком в нейронку. Работай строго по нему.
+
+| | |
+|---|---|
+| Блок | `B4` · `priority` · группа BACKEND |
+| Владелец | **Пашок** |
+| Запасной | Женёк |
+| Первое ревью | Женёк |
+| Одобряет merge | Арсений или Некит (не автор PR) |
+| Ветка | `feat/B4-<кратко>` → PR в `pair/backend` |
+| Зависит от | B2, B5, L1 |
+| Кто использует | B0, B6, B7, F2 |
+
+## Цель
+Ответ на вопросы задачи «что приоритетнее» и «какие факторы влияют». Балл 0–100 как прозрачная сумма факторов; каждый фактор — отдельная маленькая функция.
+
+## Разрешённые пути
+Можно создавать и менять ТОЛЬКО эти файлы:
+- `backend/app/blocks/priority/**`
+- `backend/tests/blocks/priority/**`
+
+## Порт (что блок обязан предоставить)
+```python
+# backend/app/blocks/priority/__init__.py
+def score(cluster: Cluster, reports: list[Report], history: list[Report], ctx: Context,
+          weights: dict[str, float] | None = None) -> Priority: ...
+
+# backend/app/blocks/priority/factors/<code>.py — по одному файлу на фактор:
+def evaluate(cluster, reports, history, ctx) -> tuple[float | None, list[str]]: ...   # (score 0..1 | None, evidence)
+```
+| Код | Фактор | Вес | Как считать |
+|---|---|---|---|
+| `HZ` | Опасность | 0.25 | база по категории (manhole 0.9, tree 0.7, water_leak 0.6, pothole 0.5, streetlight 0.4, traffic_sign 0.5, garbage 0.2, public_space 0.1) + 0.2 за `extracted.injured` или слова-сигналы; максимум 1 |
+| `DM` | Спрос | 0.15 | `min(1, (кол-во обращений + сумма confirmations) / 10)` |
+| `AG` | Возраст | 0.15 | `min(1, дней с first_reported_at / 14)` |
+| `SP` | Соц. объекты | 0.15 | school/kindergarten/hospital ≤ 150 м → 1.0; ≤ 300 м → 0.5; иначе 0. Нет инфраструктуры в ctx → `None` |
+| `RC` | Повтор | 0.10 | в `history` есть решённое обращение той же категории ≤ 60 м за 12 мес → 1.0, иначе 0. Пустая history → `None` |
+| `EX` | Мероприятие | 0.10 | **дополнительный блок X1.** В ядре всегда `None` (`ctx.events` пуст) → вес перераспределяется перенормировкой. Формула — в контракте X1 |
+| `WX` | Погода | 0.05 | tree при ветре ≥ 15 м/с → 1; water_leak при t ≤ 0 → 1; иначе 0. Нет погоды → `None` |
+| `VF` | Достоверность | 0.05 | доля обращений с фото или `verification.status` in (plausible, confirmed) |
+
+`score = 100 × Σ(w·s) / Σ(w)` только по факторам, где `s is not None` (перенормировка при пропусках).
+**Аварийный минимум:** если `HZ.score ≥ 0.9`, итоговый балл не ниже 80; разница добавляется отдельным фактором `code="FL"`, `label="Аварийный минимум"`, `weight=0`, `points=разница`, с `evidence`.
+`points` фактора = его доля в итоговых баллах. `confidence` = доля веса факторов с данными.
+`needs_review = confidence < 0.5` ИЛИ любое обращение кластера `verification.status == "suspicious"`.
+
+## Модели контрактов, которые использует блок
+Импорт: `from app.contracts.models import ...` (фронт — типы из сгенерированного клиента). Не менять, не копировать.
+```python
+class Report(BaseModel):
+    """Одно обращение. Поля совместимы с Open311 GeoReport v2 service_request."""
+
+    id: str
+    source: Literal["dataset", "citizen", "voice"] = "dataset"
+    category: str  # одно из CATEGORIES
+    text: str
+    lang: Literal["ro", "ru", "en"] | None = None
+    location: GeoPoint
+    address: str | None = None
+    photo_url: str | None = None
+    created_at: datetime
+    status: Literal["open", "in_progress", "resolved", "rejected"] = "open"
+    cluster_id: str | None = None
+    confirmations: int = 0  # «у меня тоже» / «всё ещё там» от жителей
+    extracted: Extracted | None = None
+    verification: Verification | None = None
+
+
+class Cluster(BaseModel):
+    """Одна реальная проблема = одно или несколько обращений."""
+
+    id: str
+    category: str
+    centroid: GeoPoint
+    report_ids: list[str]
+    links: list[DupLink] = []
+    first_reported_at: datetime
+    last_reported_at: datetime
+    status: Literal["open", "planned", "in_progress", "resolved"] = "open"
+
+
+class Context(BaseModel):
+    """Всё внешнее, что влияет на решения. Собирает блок B5."""
+
+    now: datetime
+    weather: Weather | None = None
+    events: list[Event] = []
+    infrastructure: list[InfraObject] = []
+
+
+class Factor(BaseModel):
+    """Вклад одного фактора в приоритет. Из этого фронт рисует PriorityBar."""
+
+    code: str  # HZ DM AG SP RC EX WX VF
+    label: str  # человекочитаемо, на русском
+    score: float | None  # 0..1; None = данных нет, фактор исключён из суммы
+    weight: float
+    points: float  # вклад в итоговые 0..100
+    evidence: list[str] = []
+
+
+class Priority(BaseModel):
+    cluster_id: str
+    score: float = Field(ge=0, le=100)
+    factors: list[Factor]
+    confidence: float = Field(ge=0, le=1)
+    needs_review: bool = False
+```
+
+## Уровни (заменяемость)
+| Уровень | Что сделать |
+|---|---|
+| **L0** | Только `HZ DM AG`, остальные возвращают `None`. |
+| **L1** | Все факторы, кроме `EX`: файл `factors/ex.py` создаётся заглушкой, возвращающей `(None, [])` — его реализует дополнительный блок X1. Веса читаются из `backend/app/blocks/priority/weights.yaml`. |
+| **L2** | `GET/PUT /api/v1/priority/weights` — оператор двигает веса (роут добавляет C0-владелец по запросу). |
+
+Переключатель: —
+
+## Зависимости, которыми можно пользоваться (уже установлены)
+`pyyaml`
+
+## Критерии приёмки
+Ссылки вида `expect.*` — это раздел `expect` в `backend/app/fixtures/demo_city.json`.
+1. Кластер `r011` (открытый люк у детсада) → `score ≥ expect.min_score_manhole` и есть фактор `FL`; кластер `r001` → `score ≥ expect.min_score_school_pothole`. Эталон на полном контексте без мероприятий: 80 (аварийный минимум; «сырой» балл ≈ 57) и ≈ 81.9.
+2. Эти два кластера — первые два по баллу и на L0, и на L1.
+3. Кластер `r005` получает `score ≤ expect.max_score_low_noise`.
+4. Сумма `points` всех факторов = `score` ± 0.1.
+5. При `ctx.weather=None` и пустой инфраструктуре балл считается, `WX` и `SP` имеют `score=None`, `confidence < 1`.
+6. Кластер `r006` (suspicious) → `needs_review=True`.
+7. Кластер `r001`: в `RC.evidence` упомянуто `r016`.
+8. При пустом `ctx.events` фактор `EX` имеет `score=None` и серый статус «нет данных», балл не ломается.
+9. У каждого фактора с `score > 0` непустой `evidence` на русском.
+
+## Запрещено
+- Вызывать LLM — балл считает только код.
+- Один файл со всеми факторами: каждый фактор — свой файл и свой тест.
+- Менять веса в коде вместо `weights.yaml`.
+
+## Общие правила (одинаковы для всех блоков)
+1. **Трогай только файлы из раздела «Разрешённые пути».** Нужно изменить что-то вне списка — ОСТАНОВИСЬ и напиши владельцу этого файла. CI отклонит PR, который вышел за свои пути.
+2. **Модели из `backend/app/contracts/models.py` не менять и не копировать.** Только импортировать. Не хватает поля — остановись, напиши Арсению или Некиту.
+3. **Сначала уровень L0, отдельным PR.** Только после его приёмки — L1. L2 — только по прямому указанию.
+4. **Переключатель уровня — переменная окружения** из раздела «Уровни». По умолчанию всегда L0. Любая ошибка L1 (сеть, ключ, таймаут, исключение) → тихий откат на L0 и запись в лог, а не падение.
+5. **Внешние вызовы:** таймаут ≤ 5 с, максимум 1 повтор. В тестах сеть запрещена: тесты проходят без интернета и без ключей.
+6. **Все библиотеки из раздела «Зависимости» уже установлены в каркасе** (`sentence-transformers` — extra `ml`: `uv sync --extra ml`). Файлы `pyproject.toml`, `uv.lock`, `package.json`, `bun.lock` НЕ трогай. Нужна другая библиотека — остановись и спроси.
+7. **Миграции БД делает только блок D1.** Регистрацию роутов в `backend/app/api/main.py` делает только C0.
+8. **Тесты обязательны** и лежат в пути из контракта. Каждый критерий приёмки = минимум один тест. Данные для тестов — только `backend/app/fixtures/demo_city.json` (не выдумывай свои).
+9. **Размер PR ≤ 200 строк** без учёта тестов. Больше — дели на части.
+10. Без `print`, без закомментированного кода, без TODO «на потом». Типы везде. `ruff check` чистый.
+
+## Порядок работы
+1. Попроси нейронку разбить контракт на подзадачи: сначала L0 и тесты к нему.
+2. Отдай подзадачи в CLI-агент. Следи, какие файлы он меняет.
+3. Запусти тесты сам. Попроси нейронку сломать реализацию и убедись, что тесты падают.
+4. Открой PR и отправь отчёт в чат по шаблону ниже. Жди ревью, не начинай следующий уровень.
+
+## Отчёт в чат
+```
+БЛОК: <id> · УРОВЕНЬ: L0 | L1
+ВЕТКА: feat/<id>-<кратко>  →  PR в: <pair-ветка>
+ИЗМЕНЁННЫЕ ФАЙЛЫ: <список>
+ТЕСТЫ: <вывод pytest / tsc — последние строки>
+КРИТЕРИИ ПРИЁМКИ: [x] 1  [x] 2  [ ] 3 — <почему не выполнен>
+ВЫШЕЛ ЗА РАЗРЕШЁННЫЕ ПУТИ: нет | да — <что и зачем>
+ВОПРОСЫ / БЛОКЕРЫ: <или «нет»>
+```

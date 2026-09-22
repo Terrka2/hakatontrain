@@ -1,0 +1,167 @@
+# L2 · LLM: ассистент-диспетчер на фиксированном графе
+
+> **Контракт блока.** Вставь этот файл целиком в нейронку. Работай строго по нему.
+
+| | |
+|---|---|
+| Блок | `L2` · `assistant` · группа LLM |
+| Владелец | **Некит** |
+| Запасной | Женёк |
+| Первое ревью | Арсений |
+| Одобряет merge | Арсений или Некит (не автор PR) |
+| Ветка | `feat/L2-<кратко>` → PR в `pair/llm` |
+| Зависит от | L3, D2 |
+| Кто использует | F3, F4 |
+
+## Цель
+Голос ИИ-оператора. Руководитель или бригадир пишет (или говорит) обычным языком — граф определяет намерение из ЗАКРЫТОГО списка, вызывает разрешённый инструмент, объясняет результат. Модель не решает, что ей можно; это решает граф.
+
+## Разрешённые пути
+Можно создавать и менять ТОЛЬКО эти файлы:
+- `backend/app/blocks/assistant/**`
+- `backend/app/api/routes/assistant.py`
+- `backend/tests/blocks/assistant/**`
+
+## Порт (что блок обязан предоставить)
+```python
+# backend/app/blocks/assistant/__init__.py
+Intent = Literal["what_happened", "explain_priority", "explain_plan", "find_similar", "crew_status",
+                 "rebuild_plan", "set_weather", "review_cluster", "approve_plan", "my_route", "report_job",
+                 "smalltalk", "unknown"]
+
+def handle(req: AssistantRequest) -> AssistantResponse: ...
+def confirm(session_id: str, pending_id: str, approve: bool) -> AssistantResponse: ...
+def narrate(run: OperatorRun) -> str: ...        # человеческий текст для ленты оператора; LLM=off → run.summary как есть
+```
+Граф (LangGraph `StateGraph`), узлы фиксированы:
+`classify_intent → check_role → gather_context(ui_state) → call_tool → [needs_confirmation?] → compose_answer`
+- `check_role`: таблица «роль → разрешённые intent». supervisor — всё; crew — только `my_route`, `report_job`, `explain_plan`, `smalltalk`.
+- `gather_context`: так ассистент «видит карту» — берёт `ui_state.selected_cluster_id`, `bbox`, `filters`.
+- `call_tool`: ровно один инструмент из L3 на intent; параметры — структурированный вывод по схеме инструмента.
+- инструменты с `requires_human=True` (утвердить план, отклонить обращение) возвращают `PendingAction` и выполняются только через `confirm(...)` человеком-supervisor; остальные оператор выполняет сам и пишет в журнал.
+- `compose_answer`: текст пишет LLM, но ТОЛЬКО по результату инструмента; числа берутся из результата, не из головы модели.
+- `trace` содержит пройденные узлы.
+Роуты: `POST /api/v1/assistant/message`, `POST /api/v1/assistant/confirm`, `GET /api/v1/assistant/narrate/{run_id}` → текст для ленты (блок B0 сам L2 не вызывает — иначе цикл зависимостей).
+
+## Модели контрактов, которые использует блок
+Импорт: `from app.contracts.models import ...` (фронт — типы из сгенерированного клиента). Не менять, не копировать.
+```python
+class UIState(BaseModel):
+    """Что сейчас на экране. Так ассистент «видит карту» — без пикселей."""
+
+    role: Literal["supervisor", "crew", "citizen"] = "supervisor"
+    bbox: tuple[float, float, float, float] | None = (
+        None  # min_lon, min_lat, max_lon, max_lat
+    )
+    selected_cluster_id: str | None = None
+    filters: dict[str, Any] = {}
+
+
+class UIAction(BaseModel):
+    kind: Literal[
+        "focus_cluster",
+        "show_plan",
+        "show_run",
+        "show_crew",
+        "set_filter",
+        "show_trip",
+        "open_report_form",
+    ]
+    payload: dict[str, Any] = {}
+
+
+class PendingAction(BaseModel):
+    """Действие, которое ИИ-оператор сам выполнить не вправе: ждёт решения руководителя."""
+
+    id: str
+    tool: str  # имя write-инструмента
+    args: dict[str, Any]
+    summary: str  # что именно будет сделано, человеческим языком
+
+
+class AssistantRequest(BaseModel):
+    session_id: str
+    message: str
+    ui_state: UIState = UIState()
+
+
+class AssistantResponse(BaseModel):
+    text: str
+    actions: list[UIAction] = []
+    pending: PendingAction | None = None
+    trace: list[
+        str
+    ] = []  # пройденные узлы графа: ["intent:build_plan", "tool:solve", ...]
+
+
+class OperatorRun(BaseModel):
+    """Один самостоятельный проход ИИ-оператора. Лента этих записей — «что сделал оператор»."""
+
+    id: str
+    trigger: Literal["import", "new_report", "job_update", "weather", "manual"]
+    at: datetime
+    reports_seen: int
+    clusters_total: int
+    clusters_new: int
+    needs_review: list[str] = []  # cluster ids, которые ждут человека
+    plan_id: str | None = None  # черновик плана, который оператор собрал или перестроил
+    decisions: list[Decision] = []
+    summary: str = ""  # человеческим языком; пишет L2, при LLM=off — шаблон
+```
+
+## Уровни (заменяемость)
+| Уровень | Что сделать |
+|---|---|
+| **L0** | `LLM=off`: intent по ключевым словам RU/RO, ответ по шаблонам. Весь граф и инструменты работают. |
+| **L1** | `LLM=on`: `classify_intent`, извлечение параметров и `compose_answer` через `backend/app/llm`. |
+| **L2** | Разговор бригады голосом: «закончили раньше, что дальше?», «тут нужен экскаватор» → `report_job`. |
+
+Переключатель: `LLM=off|on`
+
+## Зависимости, которыми можно пользоваться (уже установлены)
+`langgraph`
+
+## Критерии приёмки
+Ссылки вида `expect.*` — это раздел `expect` в `backend/app/fixtures/demo_city.json`.
+1. «что ты сделал за утро?» → `what_happened`: ответ построен по последним `OperatorRun`, числа совпадают с лентой.
+2. «почему эта яма первая?» при выбранном кластере → `explain_priority`, названы топ-3 фактора ИЗ `Priority.factors`.
+3. «пошёл ливень» → `set_weather(storm)` выполнен сразу (человек не нужен), оператор перестроил черновик; в ответе перечислено, что отложено, и `actions` содержит `show_plan`.
+4. «утверди план» от supervisor → `pending` заполнен, план остаётся `draft` до `confirm`; после `confirm` — `approved`.
+5. «утверди план» от crew → отказ, инструмент НЕ вызван (проверяется по `trace`).
+6. «что у меня дальше?» от crew1 → `my_route`, следующая `pending`-остановка бригады c1.
+7. Одинаковый запрос дважды при `LLM=off` → одинаковый `trace` и одинаковый результат инструмента.
+8. `narrate(run)` при `LLM=on` не содержит чисел, которых нет в `run`. Непонятный запрос → `unknown` и список умений.
+
+## Запрещено
+- Свободный агент / ReAct-цикл: только фиксированный граф.
+- Давать модели инструменты записи без `PendingAction`.
+- Считать маршруты или приоритеты внутри LLM.
+
+## Общие правила (одинаковы для всех блоков)
+1. **Трогай только файлы из раздела «Разрешённые пути».** Нужно изменить что-то вне списка — ОСТАНОВИСЬ и напиши владельцу этого файла. CI отклонит PR, который вышел за свои пути.
+2. **Модели из `backend/app/contracts/models.py` не менять и не копировать.** Только импортировать. Не хватает поля — остановись, напиши Арсению или Некиту.
+3. **Сначала уровень L0, отдельным PR.** Только после его приёмки — L1. L2 — только по прямому указанию.
+4. **Переключатель уровня — переменная окружения** из раздела «Уровни». По умолчанию всегда L0. Любая ошибка L1 (сеть, ключ, таймаут, исключение) → тихий откат на L0 и запись в лог, а не падение.
+5. **Внешние вызовы:** таймаут ≤ 5 с, максимум 1 повтор. В тестах сеть запрещена: тесты проходят без интернета и без ключей.
+6. **Все библиотеки из раздела «Зависимости» уже установлены в каркасе** (`sentence-transformers` — extra `ml`: `uv sync --extra ml`). Файлы `pyproject.toml`, `uv.lock`, `package.json`, `bun.lock` НЕ трогай. Нужна другая библиотека — остановись и спроси.
+7. **Миграции БД делает только блок D1.** Регистрацию роутов в `backend/app/api/main.py` делает только C0.
+8. **Тесты обязательны** и лежат в пути из контракта. Каждый критерий приёмки = минимум один тест. Данные для тестов — только `backend/app/fixtures/demo_city.json` (не выдумывай свои).
+9. **Размер PR ≤ 200 строк** без учёта тестов. Больше — дели на части.
+10. Без `print`, без закомментированного кода, без TODO «на потом». Типы везде. `ruff check` чистый.
+
+## Порядок работы
+1. Попроси нейронку разбить контракт на подзадачи: сначала L0 и тесты к нему.
+2. Отдай подзадачи в CLI-агент. Следи, какие файлы он меняет.
+3. Запусти тесты сам. Попроси нейронку сломать реализацию и убедись, что тесты падают.
+4. Открой PR и отправь отчёт в чат по шаблону ниже. Жди ревью, не начинай следующий уровень.
+
+## Отчёт в чат
+```
+БЛОК: <id> · УРОВЕНЬ: L0 | L1
+ВЕТКА: feat/<id>-<кратко>  →  PR в: <pair-ветка>
+ИЗМЕНЁННЫЕ ФАЙЛЫ: <список>
+ТЕСТЫ: <вывод pytest / tsc — последние строки>
+КРИТЕРИИ ПРИЁМКИ: [x] 1  [x] 2  [ ] 3 — <почему не выполнен>
+ВЫШЕЛ ЗА РАЗРЕШЁННЫЕ ПУТИ: нет | да — <что и зачем>
+ВОПРОСЫ / БЛОКЕРЫ: <или «нет»>
+```

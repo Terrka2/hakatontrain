@@ -1,0 +1,143 @@
+{
+  "C0": [
+    "backend/**",
+    "frontend/**",
+    "docker-compose*.yml",
+    ".env.example",
+    "README.md",
+    ".github/workflows/**",
+    "scripts/**",
+    "docs/contracts/C0_*"
+  ],
+  "B0": [
+    "backend/app/blocks/operator/**",
+    "backend/app/api/routes/clusters.py",
+    "backend/app/api/routes/operator.py",
+    "backend/tests/blocks/operator/**",
+    "docs/contracts/B0_*"
+  ],
+  "B1": [
+    "backend/app/blocks/ingest/**",
+    "backend/app/api/routes/reports.py",
+    "backend/tests/blocks/ingest/**",
+    "docs/contracts/B1_*"
+  ],
+  "B2": [
+    "backend/app/blocks/geo/**",
+    "backend/tests/blocks/geo/**",
+    "docs/contracts/B2_*"
+  ],
+  "B3": [
+    "backend/app/blocks/clusters/**",
+    "backend/tests/blocks/clusters/**",
+    "docs/contracts/B3_*"
+  ],
+  "B4": [
+    "backend/app/blocks/priority/**",
+    "backend/tests/blocks/priority/**",
+    "docs/contracts/B4_*"
+  ],
+  "B5": [
+    "backend/app/blocks/context/**",
+    "backend/app/api/routes/context.py",
+    "backend/tests/blocks/context/**",
+    "docs/contracts/B5_*"
+  ],
+  "B6": [
+    "backend/app/blocks/dispatch/**",
+    "backend/app/api/routes/plan.py",
+    "backend/tests/blocks/dispatch/**",
+    "docs/contracts/B6_*"
+  ],
+  "B7": [
+    "backend/app/blocks/navigator/**",
+    "backend/app/api/routes/trips.py",
+    "backend/tests/blocks/navigator/**",
+    "docs/contracts/B7_*"
+  ],
+  "B8": [
+    "backend/app/blocks/fieldwork/**",
+    "backend/app/api/routes/crew.py",
+    "backend/tests/blocks/fieldwork/**",
+    "docs/contracts/B8_*"
+  ],
+  "X1": [
+    "backend/app/blocks/events/**",
+    "backend/app/api/routes/events.py",
+    "backend/app/blocks/priority/factors/ex.py",
+    "backend/tests/blocks/events/**",
+    "docs/contracts/X1_*"
+  ],
+  "D1": [
+    "backend/app/db/**",
+    "backend/app/alembic/versions/**",
+    "backend/app/initial_data.py",
+    "backend/tests/db/**",
+    "docs/contracts/D1_*"
+  ],
+  "D2": [
+    "backend/app/blocks/search/**",
+    "backend/app/api/routes/search.py",
+    "backend/tests/blocks/search/**",
+    "docs/contracts/D2_*"
+  ],
+  "L1": [
+    "backend/app/blocks/extractor/**",
+    "backend/app/llm/**",
+    "backend/tests/blocks/extractor/**",
+    "docs/contracts/L1_*"
+  ],
+  "L2": [
+    "backend/app/blocks/assistant/**",
+    "backend/app/api/routes/assistant.py",
+    "backend/tests/blocks/assistant/**",
+    "docs/contracts/L2_*"
+  ],
+  "L3": [
+    "backend/app/blocks/tools/**",
+    "backend/app/mcp_server.py",
+    "backend/tests/blocks/tools/**",
+    "docs/contracts/L3_*"
+  ],
+  "F1": [
+    "frontend/src/features/map/**",
+    "frontend/src/routes/_layout/index.tsx",
+    "frontend/src/lib/api.ts",
+    "frontend/src/lib/ui-state.ts",
+    "docs/contracts/F1_*"
+  ],
+  "F2": [
+    "frontend/src/features/queue/**",
+    "frontend/src/routes/_layout/queue.tsx",
+    "docs/contracts/F2_*"
+  ],
+  "F3": [
+    "frontend/src/features/dispatch/**",
+    "frontend/src/routes/_layout/plan.tsx",
+    "docs/contracts/F3_*"
+  ],
+  "F4": [
+    "frontend/src/features/assistant/**",
+    "docs/contracts/F4_*"
+  ],
+  "F5": [
+    "frontend/src/features/crew/**",
+    "frontend/src/routes/_layout/crew.tsx",
+    "docs/contracts/F5_*"
+  ],
+  "F6": [
+    "frontend/src/index.css",
+    "frontend/src/theme/**",
+    "frontend/src/components/ui/**",
+    "frontend/public/**",
+    "docs/design/**",
+    "docs/contracts/F6_*"
+  ],
+  "F7": [
+    "frontend/src/features/citizen/**",
+    "frontend/src/routes/_layout/trip.tsx",
+    "frontend/src/routes/_layout/events.tsx",
+    "frontend/src/routes/_layout/report.tsx",
+    "docs/contracts/F7_*"
+  ]
+}

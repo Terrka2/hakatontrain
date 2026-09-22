@@ -1,0 +1,150 @@
+# B8 · Работа бригад: маршрут, статусы, «не могу»
+
+> **Контракт блока.** Вставь этот файл целиком в нейронку. Работай строго по нему.
+
+| | |
+|---|---|
+| Блок | `B8` · `fieldwork` · группа BACKEND |
+| Владелец | **Пашок** |
+| Запасной | Женёк |
+| Первое ревью | Женёк |
+| Одобряет merge | Арсений или Некит (не автор PR) |
+| Ветка | `feat/B8-<кратко>` → PR в `pair/backend` |
+| Зависит от | B6, D1 |
+| Кто использует | B0, F5, L3 |
+
+## Цель
+Обратная связь с улицы. Бригада видит свой утверждённый маршрут и отмечает: приехал / сделано (с фото) / не могу выполнить (с причиной). Каждое «не могу» будит ИИ-оператора.
+
+## Разрешённые пути
+Можно создавать и менять ТОЛЬКО эти файлы:
+- `backend/app/blocks/fieldwork/**`
+- `backend/app/api/routes/crew.py`
+- `backend/tests/blocks/fieldwork/**`
+
+## Порт (что блок обязан предоставить)
+```python
+# backend/app/blocks/fieldwork/__init__.py
+def get_crew_route(crew_id: str) -> CrewRoute | None: ...          # только из плана со status="approved"
+def apply_update(update: JobUpdate) -> RouteStop: ...               # меняет статус остановки, валидирует переход
+def progress(plan_id: str) -> dict[str, dict[str, int]]: ...        # crew_id -> {"done": 2, "failed": 1, "pending": 3}
+```
+Допустимые переходы: `pending → arrived → done | failed`; `pending → failed`. Остальное → ошибка 409.
+`done` без `photo_url` → 422. `failed` без `reason` → 422. `needs_other_skill` без `needs_skill` → 422.
+`done` → кластеры задачи получают `status="resolved"`, их обращения — `resolved`.
+`failed` → вызвать `app.blocks.operator.operator_run("job_update", now, update)` (перестройку делает оператор, не этот блок).
+
+Роуты (`/api/v1/crew`): `GET /crew/me/route` (роль crew — свой маршрут по `crew_id` пользователя); `POST /crew/jobs/{job_id}/status` (тело `JobUpdate`); `GET /crew/progress` (supervisor).
+
+## Модели контрактов, которые использует блок
+Импорт: `from app.contracts.models import ...` (фронт — типы из сгенерированного клиента). Не менять, не копировать.
+```python
+class CrewRoute(BaseModel):
+    crew_id: str
+    stops: list[RouteStop]
+    geometry: list[GeoPoint] = []  # линия для карты
+    drive_min: int = 0
+    work_min: int = 0
+
+
+class RouteStop(BaseModel):
+    job_id: str
+    location: GeoPoint
+    arrival: datetime
+    departure: datetime
+    status: Literal["pending", "arrived", "done", "failed"] = "pending"
+
+
+class JobUpdate(BaseModel):
+    """Сообщение бригады с выезда. «failed» запускает перестройку плана."""
+
+    job_id: str
+    crew_id: str
+    status: Literal["arrived", "done", "failed"]
+    at: datetime
+    photo_url: str | None = None  # обязательно для done
+    reason: (
+        Literal["no_access", "needs_other_skill", "not_found", "weather", "other"]
+        | None
+    ) = None  # для failed
+    needs_skill: str | None = None  # для needs_other_skill: одно из SKILLS
+    note: str | None = None
+
+
+class Plan(BaseModel):
+    id: str
+    day: date
+    routes: list[CrewRoute]
+    unassigned: list[str] = []  # job ids
+    total_priority: int = 0
+    baseline_total_priority: int = 0  # порядок «по времени поступления»
+    decisions: list[Decision] = []
+    engine: str = "greedy"  # "greedy" | "vroom"
+    status: Literal["draft", "approved", "superseded"] = (
+        "draft"  # бригады видят только approved
+    )
+    version: int = 1  # растёт при каждой перестройке
+    approved_by: str | None = None  # email руководителя; ИИ утверждать план не может
+
+
+class Crew(BaseModel):
+    id: str
+    name: str
+    skills: list[str]  # одно из SKILLS
+    start: GeoPoint
+    shift_start: datetime
+    shift_end: datetime
+```
+
+## Уровни (заменяемость)
+| Уровень | Что сделать |
+|---|---|
+| **L0** | В памяти, на плане из fixture-прохода. |
+| **L1** | Через репозиторий D1; загрузка фото — файл на диск `uploads/`, в модель кладётся путь. |
+| **L2** | Геометка телефона при отметке: предупреждение, если бригада дальше 200 м от остановки. |
+
+Переключатель: `USE_MOCK=true|false`
+
+## Зависимости, которыми можно пользоваться (уже установлены)
+`python-multipart` (есть в шаблоне)
+
+## Критерии приёмки
+Ссылки вида `expect.*` — это раздел `expect` в `backend/app/fixtures/demo_city.json`.
+1. Бригада c1 видит только свои остановки и только из утверждённого плана; при одном лишь черновике — пустой маршрут с понятным сообщением.
+2. `done` с фото → остановка `done`, кластеры задачи `resolved`.
+3. `done` без фото, `failed` без причины, переход `done → arrived` → ошибки 422 / 409, данные не изменились.
+4. `failed` → зафиксирован вызов `operator_run("job_update", …)` (в тесте — мок) ровно один раз.
+5. Бригада c1 не может отметить задачу бригады c2 → 403.
+
+## Запрещено
+- Перестраивать план самому — это B6 через B0.
+- Показывать бригаде черновики.
+
+## Общие правила (одинаковы для всех блоков)
+1. **Трогай только файлы из раздела «Разрешённые пути».** Нужно изменить что-то вне списка — ОСТАНОВИСЬ и напиши владельцу этого файла. CI отклонит PR, который вышел за свои пути.
+2. **Модели из `backend/app/contracts/models.py` не менять и не копировать.** Только импортировать. Не хватает поля — остановись, напиши Арсению или Некиту.
+3. **Сначала уровень L0, отдельным PR.** Только после его приёмки — L1. L2 — только по прямому указанию.
+4. **Переключатель уровня — переменная окружения** из раздела «Уровни». По умолчанию всегда L0. Любая ошибка L1 (сеть, ключ, таймаут, исключение) → тихий откат на L0 и запись в лог, а не падение.
+5. **Внешние вызовы:** таймаут ≤ 5 с, максимум 1 повтор. В тестах сеть запрещена: тесты проходят без интернета и без ключей.
+6. **Все библиотеки из раздела «Зависимости» уже установлены в каркасе** (`sentence-transformers` — extra `ml`: `uv sync --extra ml`). Файлы `pyproject.toml`, `uv.lock`, `package.json`, `bun.lock` НЕ трогай. Нужна другая библиотека — остановись и спроси.
+7. **Миграции БД делает только блок D1.** Регистрацию роутов в `backend/app/api/main.py` делает только C0.
+8. **Тесты обязательны** и лежат в пути из контракта. Каждый критерий приёмки = минимум один тест. Данные для тестов — только `backend/app/fixtures/demo_city.json` (не выдумывай свои).
+9. **Размер PR ≤ 200 строк** без учёта тестов. Больше — дели на части.
+10. Без `print`, без закомментированного кода, без TODO «на потом». Типы везде. `ruff check` чистый.
+
+## Порядок работы
+1. Попроси нейронку разбить контракт на подзадачи: сначала L0 и тесты к нему.
+2. Отдай подзадачи в CLI-агент. Следи, какие файлы он меняет.
+3. Запусти тесты сам. Попроси нейронку сломать реализацию и убедись, что тесты падают.
+4. Открой PR и отправь отчёт в чат по шаблону ниже. Жди ревью, не начинай следующий уровень.
+
+## Отчёт в чат
+```
+БЛОК: <id> · УРОВЕНЬ: L0 | L1
+ВЕТКА: feat/<id>-<кратко>  →  PR в: <pair-ветка>
+ИЗМЕНЁННЫЕ ФАЙЛЫ: <список>
+ТЕСТЫ: <вывод pytest / tsc — последние строки>
+КРИТЕРИИ ПРИЁМКИ: [x] 1  [x] 2  [ ] 3 — <почему не выполнен>
+ВЫШЕЛ ЗА РАЗРЕШЁННЫЕ ПУТИ: нет | да — <что и зачем>
+ВОПРОСЫ / БЛОКЕРЫ: <или «нет»>
+```

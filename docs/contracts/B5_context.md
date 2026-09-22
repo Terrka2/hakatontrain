@@ -1,0 +1,147 @@
+# B5 · Контекст: погода и соц. объекты
+
+> **Контракт блока.** Вставь этот файл целиком в нейронку. Работай строго по нему.
+
+| | |
+|---|---|
+| Блок | `B5` · `context` · группа BACKEND |
+| Владелец | **Пашок** |
+| Запасной | Некит |
+| Первое ревью | Женёк |
+| Одобряет merge | Арсений или Некит (не автор PR) |
+| Ветка | `feat/B5-<кратко>` → PR в `pair/backend` |
+| Зависит от | D1 |
+| Кто использует | B0, B4, B6 |
+
+## Цель
+Собрать внешние обстоятельства, которые меняют решения оператора: погоду и социальные объекты рядом. Только проверенные источники из allowlist.
+
+## Разрешённые пути
+Можно создавать и менять ТОЛЬКО эти файлы:
+- `backend/app/blocks/context/**`
+- `backend/app/api/routes/context.py`
+- `backend/tests/blocks/context/**`
+
+## Порт (что блок обязан предоставить)
+```python
+# backend/app/blocks/context/__init__.py
+def get_weather(point: GeoPoint, at: datetime) -> Weather | None: ...
+def build_context(now: datetime) -> Context: ...            # events=[] — их добавляет только блок X1
+def apply_weather_rules(jobs: list[Job], weather: Weather | None) -> tuple[list[Job], list[Decision]]: ...
+```
+Правила погоды — таблица в `backend/app/blocks/context/weather_rules.yaml`, не в коде:
+- осадки ≥ 5 мм → задачи навыка `road` категории `pothole` откладываются (`Decision.kind="defer"`), убираются из списка;
+- ветер ≥ 15 м/с → задачи `tree`: `priority = min(100, priority + 20)` (`kind="boost"`);
+- осадки ≥ 5 мм → `service_min × 1.3` для остальных уличных работ.
+
+Роуты (`/api/v1/context`): `GET /context` → `Context`; `PUT /context/weather-scenario {scenario}` (supervisor) — для демо; смена сценария запускает проход оператора.
+Источники — `backend/app/blocks/context/sources.yaml` (allowlist доменов). Ничего вне списка не запрашивается.
+
+## Модели контрактов, которые использует блок
+Импорт: `from app.contracts.models import ...` (фронт — типы из сгенерированного клиента). Не менять, не копировать.
+```python
+class GeoPoint(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+
+
+class Weather(BaseModel):
+    at: datetime
+    precipitation_mm: float
+    wind_ms: float
+    temp_c: float
+    source: str  # "open-meteo" | "fixture"
+
+
+class InfraObject(BaseModel):
+    id: str
+    kind: Literal["school", "kindergarten", "hospital", "stop"]
+    name: str
+    location: GeoPoint
+
+
+class Context(BaseModel):
+    """Всё внешнее, что влияет на решения. Собирает блок B5."""
+
+    now: datetime
+    weather: Weather | None = None
+    events: list[Event] = []
+    infrastructure: list[InfraObject] = []
+
+
+class Job(BaseModel):
+    """Одна остановка бригады. Может закрывать несколько кластеров рядом."""
+
+    id: str
+    cluster_ids: list[str]
+    location: GeoPoint
+    skill: str
+    service_min: int
+    priority: int = Field(ge=0, le=100)
+    deadline: datetime | None = None  # напр. «до начала мероприятия»
+
+
+class Decision(BaseModel):
+    """Журнал решений: что и почему изменило план. Показывается оператору."""
+
+    kind: Literal[
+        "defer", "boost", "batch", "deadline", "unassigned", "param", "replan", "review"
+    ]
+    subject_id: str  # job/cluster id или имя параметра
+    reason: str
+    by: Literal["rule", "llm", "operator"]
+```
+
+## Уровни (заменяемость)
+| Уровень | Что сделать |
+|---|---|
+| **L0** | Погода и инфраструктура из fixture; сценарий `WEATHER=fixture:clear|fixture:storm`. |
+| **L1** | `WEATHER=open-meteo`: прогноз Open-Meteo по координатам (без ключа), кэш 30 минут. |
+| **L2** | — |
+
+Переключатель: `WEATHER=fixture:clear|fixture:storm|open-meteo`
+
+## Зависимости, которыми можно пользоваться (уже установлены)
+`httpx`, `pyyaml`
+
+## Критерии приёмки
+Ссылки вида `expect.*` — это раздел `expect` в `backend/app/fixtures/demo_city.json`.
+1. `fixture:storm` → `apply_weather_rules` откладывает все `pothole`-задачи и поднимает приоритет `tree`; для каждого изменения есть `Decision` с причиной на русском.
+2. `fixture:clear` → список задач не меняется, `decisions == []`.
+3. `weather=None` → задачи не меняются, исключений нет.
+4. Open-Meteo недоступен (мок таймаута) → возвращается fixture-погода, `source="fixture"`.
+5. `build_context` возвращает 3 объекта инфраструктуры и `events == []`.
+
+## Запрещено
+- Скрейпинг сайтов.
+- Запросы к доменам вне `sources.yaml`.
+- Работать с мероприятиями — это блок X1.
+
+## Общие правила (одинаковы для всех блоков)
+1. **Трогай только файлы из раздела «Разрешённые пути».** Нужно изменить что-то вне списка — ОСТАНОВИСЬ и напиши владельцу этого файла. CI отклонит PR, который вышел за свои пути.
+2. **Модели из `backend/app/contracts/models.py` не менять и не копировать.** Только импортировать. Не хватает поля — остановись, напиши Арсению или Некиту.
+3. **Сначала уровень L0, отдельным PR.** Только после его приёмки — L1. L2 — только по прямому указанию.
+4. **Переключатель уровня — переменная окружения** из раздела «Уровни». По умолчанию всегда L0. Любая ошибка L1 (сеть, ключ, таймаут, исключение) → тихий откат на L0 и запись в лог, а не падение.
+5. **Внешние вызовы:** таймаут ≤ 5 с, максимум 1 повтор. В тестах сеть запрещена: тесты проходят без интернета и без ключей.
+6. **Все библиотеки из раздела «Зависимости» уже установлены в каркасе** (`sentence-transformers` — extra `ml`: `uv sync --extra ml`). Файлы `pyproject.toml`, `uv.lock`, `package.json`, `bun.lock` НЕ трогай. Нужна другая библиотека — остановись и спроси.
+7. **Миграции БД делает только блок D1.** Регистрацию роутов в `backend/app/api/main.py` делает только C0.
+8. **Тесты обязательны** и лежат в пути из контракта. Каждый критерий приёмки = минимум один тест. Данные для тестов — только `backend/app/fixtures/demo_city.json` (не выдумывай свои).
+9. **Размер PR ≤ 200 строк** без учёта тестов. Больше — дели на части.
+10. Без `print`, без закомментированного кода, без TODO «на потом». Типы везде. `ruff check` чистый.
+
+## Порядок работы
+1. Попроси нейронку разбить контракт на подзадачи: сначала L0 и тесты к нему.
+2. Отдай подзадачи в CLI-агент. Следи, какие файлы он меняет.
+3. Запусти тесты сам. Попроси нейронку сломать реализацию и убедись, что тесты падают.
+4. Открой PR и отправь отчёт в чат по шаблону ниже. Жди ревью, не начинай следующий уровень.
+
+## Отчёт в чат
+```
+БЛОК: <id> · УРОВЕНЬ: L0 | L1
+ВЕТКА: feat/<id>-<кратко>  →  PR в: <pair-ветка>
+ИЗМЕНЁННЫЕ ФАЙЛЫ: <список>
+ТЕСТЫ: <вывод pytest / tsc — последние строки>
+КРИТЕРИИ ПРИЁМКИ: [x] 1  [x] 2  [ ] 3 — <почему не выполнен>
+ВЫШЕЛ ЗА РАЗРЕШЁННЫЕ ПУТИ: нет | да — <что и зачем>
+ВОПРОСЫ / БЛОКЕРЫ: <или «нет»>
+```

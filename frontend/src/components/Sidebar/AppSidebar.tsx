@@ -32,7 +32,12 @@ const crewItems: Item[] = [
 export function AppSidebar() {
   const { user: currentUser } = useAuth()
 
-  const roleItems = currentUser?.role === "crew" ? crewItems : supervisorItems
+  const roleItems =
+    currentUser?.role === "supervisor"
+      ? supervisorItems
+      : currentUser?.role === "crew"
+        ? crewItems
+        : []
   const items = currentUser?.is_superuser
     ? [
         ...supervisorItems,

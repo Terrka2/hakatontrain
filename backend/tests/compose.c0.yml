@@ -1,0 +1,14 @@
+# Isolated C0 acceptance stack; does not use the host PostgreSQL on port 5432.
+services:
+  db:
+    ports: !override
+      - "127.0.0.1:15432:5432"
+  backend:
+    ports: !override
+      - "127.0.0.1:18000:8000"
+    environment:
+      FRONTEND_HOST: http://localhost:18000
+  mailpit:
+    ports: !override
+      - "127.0.0.1:18025:8025"
+      - "127.0.0.1:11025:1025"

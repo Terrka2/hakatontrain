@@ -44,3 +44,6 @@ uploads/
 openapi.json
 
 .venv/
+
+# локальное состояние Serena MCP (кто пользуется)
+.serena/

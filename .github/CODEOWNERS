@@ -6,6 +6,8 @@
 /backend/app/contracts/          @arseniistrokov @NEKIT_LOGIN
 /backend/app/fixtures/           @arseniistrokov @NEKIT_LOGIN
 /docs/                           @arseniistrokov @NEKIT_LOGIN
+# Доски задач блоков правит владелец блока — без обязательного ревью
+/docs/status/
 
 # Данные и LLM
 /backend/app/db/                 @NEKIT_LOGIN

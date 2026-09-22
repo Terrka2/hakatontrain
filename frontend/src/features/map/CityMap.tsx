@@ -100,6 +100,23 @@ export function CityMap({
   }, [ordered])
   // Подгонка один раз на новый набор кластеров (ordered мемоизирован по items); до загрузки карты — из onLoad.
   useEffect(fitAll, [fitAll])
+  // Выбор кластера (из очереди, ассистента или маркера) — карта подлетает к нему.
+  const selectedId = clusterLayer?.selectedId
+  useEffect(() => {
+    const map = mapRef.current
+    const c = ordered.find((x) => x.id === selectedId)
+    if (!c || !map?.loaded()) return
+    const phone = typeof window !== "undefined" && window.innerWidth < 768
+    map.flyTo({
+      center: [c.centroid.lon, c.centroid.lat],
+      zoom: Math.max(map.getZoom(), 14.5),
+      duration: 600,
+      padding: phone
+        ? { top: 0, bottom: 260, left: 0, right: 0 }
+        : { top: 0, bottom: 0, left: 0, right: 400 },
+    })
+  }, [selectedId, ordered])
+
   const reportBounds = useCallback(() => {
     const b = mapRef.current?.getBounds()
     if (b && onBoundsChange)

@@ -11,3 +11,4 @@ def text_similarity(a: str, b: str) -> float:
 
 def search(query: str, k: int = 5, kind: str | None = None) -> list:  # type: ignore[type-arg]
     raise NotImplementedError("D2 L1: search not implemented yet")
+

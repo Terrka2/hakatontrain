@@ -1,6 +1,6 @@
 """Блок B4 · Объяснимый приоритет. Порт блока — только то, что объявлено в этом файле.
 
-Контракт: docs/contracts/B4_priority.md. Реализация: l0.py (без сети), l1.py (целевой уровень).
+Контракт: docs/contracts/B4_priority.md. Реализация: l0.py (без сети), l1.py (целевой уровень), weights_manager.py (управление весами L2).
 """
 
 import logging
@@ -8,8 +8,11 @@ import logging
 from app.contracts.models import Cluster, Context, Priority, Report
 
 from . import l0, l1
+from .weights_manager import get_weights, update_weights
 
 log = logging.getLogger(__name__)
+
+__all__ = ["score", "get_weights", "update_weights"]
 
 
 def score(

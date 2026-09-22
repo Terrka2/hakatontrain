@@ -1,24 +1,9 @@
 """L1: целевой уровень объяснимого приоритета кластера со всеми факторами и весами из YAML."""
 
-from pathlib import Path
-
-import yaml  # type: ignore[import-untyped]
-
 from app.contracts.models import Cluster, Context, Factor, Priority, Report
 
 from . import factors
-
-WEIGHTS_PATH = Path(__file__).resolve().parent / "weights.yaml"
-DEFAULT_WEIGHTS: dict[str, float] = {
-    "HZ": 0.25,
-    "DM": 0.15,
-    "AG": 0.15,
-    "SP": 0.15,
-    "RC": 0.10,
-    "WX": 0.05,
-    "VF": 0.05,
-    "EX": 0.10,
-}
+from .weights_manager import get_weights
 
 FACTOR_DEFS = [
     ("HZ", "Опасность", factors.hz),
@@ -34,17 +19,7 @@ FACTOR_DEFS = [
 
 def load_weights() -> dict[str, float]:
     """Загружает веса из weights.yaml с fallback на значения по умолчанию."""
-    w = DEFAULT_WEIGHTS.copy()
-    if WEIGHTS_PATH.is_file():
-        try:
-            data = yaml.safe_load(WEIGHTS_PATH.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                for k, v in data.items():
-                    if k in w and isinstance(v, (int, float)) and v >= 0:
-                        w[k] = float(v)
-        except Exception:
-            pass
-    return w
+    return get_weights()
 
 
 def score(

@@ -120,4 +120,3 @@ def test_fallback_to_l0_on_l1_failure(
 
     assert isinstance(result, float), f"Ожидался float, получено {type(result)}"
     assert 0.0 <= result <= 1.0, f"Результат {result} вне диапазона [0, 1]"
-

@@ -1,0 +1,379 @@
+{
+  "now": "2026-09-26T07:00:00+03:00",
+  "reports": [
+    {
+      "id": "r001",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Огромная яма прямо у входа в лицей, дети обходят по проезжей части. Уже две недели никто не чинит.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.018,
+        "lon": 28.842
+      },
+      "address": "str. Alexei Mateevici 85",
+      "photo_url": "/photos/r001.jpg",
+      "created_at": "2026-09-14T08:10:00+03:00",
+      "status": "open",
+      "confirmations": 5
+    },
+    {
+      "id": "r002",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Groapă mare în asfalt lângă liceu, mașinile ocolesc pe contrasens. Periculos pentru copii.",
+      "lang": "ro",
+      "location": {
+        "lat": 47.018225,
+        "lon": 28.842198
+      },
+      "address": "str. Alexei Mateevici 85",
+      "photo_url": "/photos/r002.jpg",
+      "created_at": "2026-09-16T17:40:00+03:00",
+      "status": "open",
+      "confirmations": 2
+    },
+    {
+      "id": "r003",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Возле лицея на Матеевича глубокая яма в асфальте, вчера велосипедист упал.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.01782,
+        "lon": 28.842329
+      },
+      "address": null,
+      "photo_url": null,
+      "created_at": "2026-09-17T09:05:00+03:00",
+      "status": "open",
+      "confirmations": 4
+    },
+    {
+      "id": "r004",
+      "source": "dataset",
+      "category": "streetlight",
+      "text": "Не горит фонарь напротив лицея, вечером на переходе совсем темно.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.01809,
+        "lon": 28.841802
+      },
+      "address": null,
+      "photo_url": "/photos/r004.jpg",
+      "created_at": "2026-09-20T21:15:00+03:00",
+      "status": "open",
+      "confirmations": 1
+    },
+    {
+      "id": "r005",
+      "source": "dataset",
+      "category": "public_space",
+      "text": "На скамейке в сквере облезла краска, выглядит неопрятно.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.04,
+        "lon": 28.86
+      },
+      "address": null,
+      "photo_url": null,
+      "created_at": "2026-09-24T12:00:00+03:00",
+      "status": "open",
+      "confirmations": 0
+    },
+    {
+      "id": "r006",
+      "source": "citizen",
+      "category": "pothole",
+      "text": "Уважаемая администрация! Хочу обратить Ваше внимание на критическую ситуацию с дорожным покрытием, которая представляет серьёзную угрозу безопасности всех участников движения и требует незамедлительного вмешательства соответствующих служб.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.006,
+        "lon": 28.87
+      },
+      "address": null,
+      "photo_url": null,
+      "created_at": "2026-09-25T03:12:00+03:00",
+      "status": "open",
+      "confirmations": 0
+    },
+    {
+      "id": "r007",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Яма на Албишоара возле дома 78, правая полоса.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.033,
+        "lon": 28.84
+      },
+      "address": "str. Albișoara 78",
+      "photo_url": "/photos/r007.jpg",
+      "created_at": "2026-09-19T10:00:00+03:00",
+      "status": "open",
+      "confirmations": 1
+    },
+    {
+      "id": "r008",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Провал асфальта у остановки, Албишоара 80/2.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.03309,
+        "lon": 28.841713
+      },
+      "address": "str. Albișoara 80/2",
+      "photo_url": "/photos/r008.jpg",
+      "created_at": "2026-09-21T11:30:00+03:00",
+      "status": "open",
+      "confirmations": 0
+    },
+    {
+      "id": "r009",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Groapă adâncă pe Albișoara 82, lângă trecerea de pietoni.",
+      "lang": "ro",
+      "location": {
+        "lat": 47.03318,
+        "lon": 28.843427
+      },
+      "address": "str. Albișoara 82",
+      "photo_url": "/photos/r009.jpg",
+      "created_at": "2026-09-22T08:45:00+03:00",
+      "status": "open",
+      "confirmations": 2
+    },
+    {
+      "id": "r010",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Две выбоины подряд на Албишоара 84, у въезда во двор.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.033269,
+        "lon": 28.845114
+      },
+      "address": "str. Albișoara 84",
+      "photo_url": "/photos/r010.jpg",
+      "created_at": "2026-09-23T19:20:00+03:00",
+      "status": "open",
+      "confirmations": 0
+    },
+    {
+      "id": "r011",
+      "source": "dataset",
+      "category": "manhole",
+      "text": "Открытый люк на тротуаре у детского сада, крышки нет совсем. Ребёнок чуть не упал!",
+      "lang": "ru",
+      "location": {
+        "lat": 47.028865,
+        "lon": 28.851736
+      },
+      "address": null,
+      "photo_url": "/photos/r011.jpg",
+      "created_at": "2026-09-25T16:30:00+03:00",
+      "status": "open",
+      "confirmations": 3
+    },
+    {
+      "id": "r012",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Яма на бульваре Штефана, прямо на трассе воскресного забега.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.024994,
+        "lon": 28.833486
+      },
+      "address": "bd. Ștefan cel Mare 134",
+      "photo_url": "/photos/r012.jpg",
+      "created_at": "2026-09-22T14:00:00+03:00",
+      "status": "open",
+      "confirmations": 2
+    },
+    {
+      "id": "r013",
+      "source": "dataset",
+      "category": "garbage",
+      "text": "Переполненные контейнеры у сквера, мусор разносит ветром по бульвару.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.024006,
+        "lon": 28.830982
+      },
+      "address": null,
+      "photo_url": "/photos/r013.jpg",
+      "created_at": "2026-09-24T07:50:00+03:00",
+      "status": "open",
+      "confirmations": 1
+    },
+    {
+      "id": "r014",
+      "source": "dataset",
+      "category": "tree",
+      "text": "Большая ветка нависла над тротуаром после ветра, держится на честном слове.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.012,
+        "lon": 28.825
+      },
+      "address": null,
+      "photo_url": "/photos/r014.jpg",
+      "created_at": "2026-09-25T18:05:00+03:00",
+      "status": "open",
+      "confirmations": 1
+    },
+    {
+      "id": "r015",
+      "source": "dataset",
+      "category": "water_leak",
+      "text": "Из-под асфальта течёт вода уже третий день, на дороге лужа на всю полосу.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.035,
+        "lon": 28.815
+      },
+      "address": null,
+      "photo_url": "/photos/r015.jpg",
+      "created_at": "2026-09-23T06:40:00+03:00",
+      "status": "open",
+      "confirmations": 2
+    },
+    {
+      "id": "r016",
+      "source": "dataset",
+      "category": "pothole",
+      "text": "Яма у лицея на Матеевича.",
+      "lang": "ru",
+      "location": {
+        "lat": 47.018045,
+        "lon": 28.842066
+      },
+      "address": null,
+      "photo_url": "/photos/r016.jpg",
+      "created_at": "2026-01-20T09:00:00+03:00",
+      "status": "resolved",
+      "confirmations": 0
+    }
+  ],
+  "infrastructure": [
+    {
+      "id": "s1",
+      "kind": "school",
+      "name": "Liceul Teoretic (демо)",
+      "location": {
+        "lat": 47.018135,
+        "lon": 28.842066
+      }
+    },
+    {
+      "id": "k1",
+      "kind": "kindergarten",
+      "name": "Grădinița nr. 1 (демо)",
+      "location": {
+        "lat": 47.029,
+        "lon": 28.852
+      }
+    },
+    {
+      "id": "h1",
+      "kind": "hospital",
+      "name": "Spitalul Clinic (демо)",
+      "location": {
+        "lat": 47.01,
+        "lon": 28.84
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "e1",
+      "title": "Chișinău Sprint — городской забег",
+      "location": {
+        "lat": 47.0245,
+        "lon": 28.8323
+      },
+      "radius_m": 400,
+      "starts_at": "2026-09-27T10:00:00+03:00",
+      "ends_at": "2026-09-27T13:00:00+03:00",
+      "expected_people": 2000,
+      "source": "fixture"
+    }
+  ],
+  "crews": [
+    {
+      "id": "c1",
+      "name": "Дорожная №1",
+      "skills": ["road"],
+      "start": {
+        "lat": 47.005,
+        "lon": 28.86
+      },
+      "shift_start": "2026-09-26T08:00:00+03:00",
+      "shift_end": "2026-09-26T16:00:00+03:00"
+    },
+    {
+      "id": "c2",
+      "name": "Электрики + зелёное хозяйство",
+      "skills": ["electric", "green"],
+      "start": {
+        "lat": 47.03,
+        "lon": 28.81
+      },
+      "shift_start": "2026-09-26T08:00:00+03:00",
+      "shift_end": "2026-09-26T16:00:00+03:00"
+    },
+    {
+      "id": "c3",
+      "name": "Санитарная + водоканал",
+      "skills": ["sanitation", "water"],
+      "start": {
+        "lat": 47.045,
+        "lon": 28.845
+      },
+      "shift_start": "2026-09-26T08:00:00+03:00",
+      "shift_end": "2026-09-26T16:00:00+03:00"
+    }
+  ],
+  "weather": {
+    "clear": {
+      "at": "2026-09-26T07:00:00+03:00",
+      "precipitation_mm": 0.0,
+      "wind_ms": 3.0,
+      "temp_c": 17.0,
+      "source": "fixture"
+    },
+    "storm": {
+      "at": "2026-09-26T07:00:00+03:00",
+      "precipitation_mm": 12.0,
+      "wind_ms": 17.0,
+      "temp_c": 11.0,
+      "source": "fixture"
+    }
+  },
+  "expect": {
+    "open_reports": 15,
+    "clusters": 13,
+    "dup_trio": ["r001", "r002", "r003"],
+    "not_dup": ["r001", "r004"],
+    "jobs_after_batching": 9,
+    "jobs_note": "13 кластеров − r006 (needs_review) = 12; четыре ямы на Albișoara → 1 выезд; итого 9",
+    "site_batch": ["r007", "r008", "r009", "r010"],
+    "top2_priority_reports": ["r011", "r001"],
+    "min_score_manhole": 80,
+    "min_score_school_pothole": 70,
+    "low_noise_report": "r005",
+    "max_score_low_noise": 30,
+    "suspicious_report": "r006",
+    "recurrence_report": "r001",
+    "storm_defers_categories": ["pothole"],
+    "storm_boosts_categories": ["tree"]
+  },
+  "expect_optional": {
+    "note": "только для дополнительных блоков X1 (мероприятия) и B7 (навигатор)",
+    "event_deadline_reports": ["r012", "r013"],
+    "event_on_trip_date": "2026-09-27"
+  }
+}

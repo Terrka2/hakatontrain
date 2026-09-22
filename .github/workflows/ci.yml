@@ -1,0 +1,46 @@
+name: ci
+on:
+  pull_request:
+    branches: [main, dev, "pair/**"]
+  push:
+    branches: [main, dev]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: changethis
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:changethis@localhost:5432/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: cp .env.example .env
+      - run: uv sync
+      - run: uv run ruff check app tests
+        working-directory: backend
+      - run: uv run alembic upgrade head && uv run python app/initial_data.py
+        working-directory: backend
+      - run: uv run pytest -q
+        working-directory: backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+        working-directory: frontend
+      - name: Цвета только из токенов F6
+        run: |
+          if grep -rnE "#[0-9a-fA-F]{3,8}\b|rgb\(" frontend/src/features; then
+            echo "В features найден цвет мимо токенов дизайн-системы (блок F6)"; exit 1
+          fi

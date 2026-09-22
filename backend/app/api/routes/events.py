@@ -5,9 +5,10 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import require_roles
-from app.blocks.events import get_events, l0
+from app.blocks.events import add_event, get_events
 from app.contracts.models import Event
 from app.core.config import settings
+from app.db import Repository, get_repository
 
 
 def require_optional_blocks() -> None:
@@ -33,10 +34,11 @@ router = APIRouter(
 def list_events(
     from_: datetime | None = Query(None, alias="from"),
     to_: datetime | None = Query(None, alias="to"),
+    repo: Repository = Depends(get_repository),
 ) -> list[Event]:
     start = from_ or datetime(2000, 1, 1, tzinfo=UTC)
     end = to_ or datetime(2100, 1, 1, tzinfo=UTC)
-    return get_events(start, end)
+    return get_events(start, end, repo=repo)
 
 
 @router.post(
@@ -45,5 +47,8 @@ def list_events(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_roles("supervisor"))],
 )
-def create_event(event: Event) -> Event:
-    return l0.add_event(event)
+def create_event(
+    event: Event,
+    repo: Repository = Depends(get_repository),
+) -> Event:
+    return add_event(event, repo=repo)

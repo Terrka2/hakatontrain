@@ -39,12 +39,16 @@ def reset_state() -> None:
 reset_state()
 
 
-def add_event(event: models.Event) -> models.Event:
+def add_event(event: models.Event, repo: object = None) -> models.Event:
+    del repo
     _events.append(event.model_copy(deep=True))
     return event.model_copy(deep=True)
 
 
-def get_events(start: datetime, end: datetime) -> list[models.Event]:
+def get_events(
+    start: datetime, end: datetime, repo: object = None
+) -> list[models.Event]:
+    del repo
     s_utc, e_utc = _to_utc(start), _to_utc(end)
     return [
         e.model_copy(deep=True)

@@ -1,21 +1,50 @@
-"""L0: базовый уровень объяснимого приоритета кластера на чистой математике."""
+"""L1: целевой уровень объяснимого приоритета кластера со всеми факторами и весами из YAML."""
+
+from pathlib import Path
+
+import yaml  # type: ignore[import-untyped]
 
 from app.contracts.models import Cluster, Context, Factor, Priority, Report
 
 from . import factors
 
-L0_ACTIVE_FACTORS = [
-    ("HZ", "Опасность", 0.25, factors.hz),
-    ("DM", "Спрос", 0.15, factors.dm),
-    ("AG", "Возраст", 0.15, factors.ag),
+WEIGHTS_PATH = Path(__file__).resolve().parent / "weights.yaml"
+DEFAULT_WEIGHTS: dict[str, float] = {
+    "HZ": 0.25,
+    "DM": 0.15,
+    "AG": 0.15,
+    "SP": 0.15,
+    "RC": 0.10,
+    "WX": 0.05,
+    "VF": 0.05,
+    "EX": 0.10,
+}
+
+FACTOR_DEFS = [
+    ("HZ", "Опасность", factors.hz),
+    ("DM", "Спрос", factors.dm),
+    ("AG", "Возраст", factors.ag),
+    ("SP", "Соц. объекты", factors.sp),
+    ("RC", "Повтор", factors.rc),
+    ("EX", "Мероприятие", factors.ex),
+    ("WX", "Погода", factors.wx),
+    ("VF", "Достоверность", factors.vf),
 ]
-L0_NONE_FACTORS = [
-    ("SP", "Соц. объекты", 0.15),
-    ("RC", "Повтор", 0.10),
-    ("EX", "Мероприятие", 0.10),
-    ("WX", "Погода", 0.05),
-    ("VF", "Достоверность", 0.05),
-]
+
+
+def load_weights() -> dict[str, float]:
+    """Загружает веса из weights.yaml с fallback на значения по умолчанию."""
+    w = DEFAULT_WEIGHTS.copy()
+    if WEIGHTS_PATH.is_file():
+        try:
+            data = yaml.safe_load(WEIGHTS_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    if k in w and isinstance(v, (int, float)) and v >= 0:
+                        w[k] = float(v)
+        except Exception:
+            pass
+    return w
 
 
 def score(
@@ -25,18 +54,22 @@ def score(
     ctx: Context,
     weights: dict[str, float] | None = None,
 ) -> Priority:
-    """Вычисляет приоритет уровня L0 (только HZ, DM, AG; остальные None)."""
-    default_w = {c: w for c, _, w, _ in L0_ACTIVE_FACTORS}
-    default_w.update({c: w for c, _, w in L0_NONE_FACTORS})
+    """Вычисляет приоритет уровня L1 по всем факторам с весами из weights.yaml."""
+    w_map = load_weights()
     if weights:
         for k, v in weights.items():
-            if k in default_w and v >= 0:
-                default_w[k] = v
+            if k in w_map and v >= 0:
+                w_map[k] = v
 
-    total_weight = sum(default_w.values())
+    total_weight = sum(w_map.values())
     res = [
-        (c, lbl, *mod.evaluate(cluster, reports, history, ctx), default_w[c])
-        for c, lbl, _, mod in L0_ACTIVE_FACTORS
+        (
+            c,
+            lbl,
+            *mod.evaluate(cluster, reports, history, ctx),
+            w_map.get(c, 0.0),
+        )
+        for c, lbl, mod in FACTOR_DEFS
     ]
     valid_weight = sum(w for _, _, s, _, w in res if s is not None)
     conf = min(1.0, max(0.0, valid_weight / total_weight)) if total_weight > 0 else 0.0
@@ -62,18 +95,6 @@ def score(
         )
         for c, lbl, s, ev, w in res
     ]
-
-    for c, lbl, _ in L0_NONE_FACTORS:
-        items.append(
-            Factor(
-                code=c,
-                label=lbl,
-                score=None,
-                weight=default_w[c],
-                points=0.0,
-                evidence=[],
-            )
-        )
 
     final = raw
     hz = next((r for r in res if r[0] == "HZ"), None)

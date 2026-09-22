@@ -299,3 +299,114 @@ def test_qa_custom_weights(
         weights={"HZ": 0.0, "DM": 0.0, "AG": 1.0},
     )
     assert res_default.score != res_custom.score
+
+
+# ==============================================================================
+# 3. L1 Тесты: критерий 7, полный контекст, weights.yaml, откат на L0
+# ==============================================================================
+
+
+def test_criterion_7_r001_recurrence_r016(
+    reports_map: dict[str, Report],
+    base_context: Context,
+) -> None:
+    """Критерий 7: кластер r001 находит в истории решённое обращение r016 (упомянуто в RC.evidence)."""
+    trio = [reports_map["r001"], reports_map["r002"], reports_map["r003"]]
+    c_r001 = make_cluster("c_r001", trio)
+    history = [reports_map["r016"]]
+
+    p = priority.score(c_r001, trio, history, base_context)
+    rc_factor = next(f for f in p.factors if f.code == "RC")
+    assert rc_factor.score == 1.0
+    assert len(rc_factor.evidence) > 0
+    assert "r016" in rc_factor.evidence[0]
+
+
+def test_l1_full_context_scores(
+    reports_map: dict[str, Report],
+    fixture_data: dict[str, Any],
+) -> None:
+    """L1: расчёт на полном контексте demo_city.json с инфраструктурой, погодой и историей."""
+    from app.contracts.models import InfraObject, Weather
+
+    full_context = Context(
+        now=datetime.fromisoformat(fixture_data["now"]),
+        weather=Weather(**fixture_data["weather"]["clear"]),
+        events=[],
+        infrastructure=[InfraObject(**inf) for inf in fixture_data["infrastructure"]],
+    )
+    history = [reports_map["r016"]]
+
+    # r001 (яма у школы s1, повтор r016)
+    trio = [reports_map["r001"], reports_map["r002"], reports_map["r003"]]
+    c_r001 = make_cluster("c_r001", trio)
+    p_r001 = priority.score(c_r001, trio, history, full_context)
+
+    factors_map = {f.code: f for f in p_r001.factors}
+    assert factors_map["SP"].score == 1.0  # школа в 15 м
+    assert factors_map["RC"].score == 1.0  # r016 в 7 м
+    assert factors_map["VF"].score == pytest.approx(2 / 3, 0.01)  # 2 фото из 3
+    assert p_r001.confidence >= 0.8  # больше факторов с данными
+    assert p_r001.score >= fixture_data["expect"]["min_score_school_pothole"]
+
+    # r011 (люк у детсада k1)
+    c_r011 = make_cluster("c_r011", [reports_map["r011"]])
+    p_r011 = priority.score(c_r011, [reports_map["r011"]], history, full_context)
+    assert p_r011.score >= fixture_data["expect"]["min_score_manhole"]
+    assert any(f.code == "FL" for f in p_r011.factors)
+
+
+def test_l1_weights_yaml_loading(
+    reports_map: dict[str, Report],
+    base_context: Context,
+) -> None:
+    """L1: веса загружаются из weights.yaml и соответствуют контракту."""
+    c = make_cluster("c_r001", [reports_map["r001"]])
+    p = priority.score(c, [reports_map["r001"]], [], base_context)
+    factors_map = {f.code: f.weight for f in p.factors}
+
+    assert factors_map["HZ"] == 0.25
+    assert factors_map["DM"] == 0.15
+    assert factors_map["AG"] == 0.15
+    assert factors_map["SP"] == 0.15
+    assert factors_map["RC"] == 0.10
+    assert factors_map["WX"] == 0.05
+    assert factors_map["VF"] == 0.05
+    assert factors_map["EX"] == 0.10
+
+
+def test_l1_fallback_to_l0_on_exception(
+    monkeypatch: pytest.MonkeyPatch,
+    reports_map: dict[str, Report],
+    base_context: Context,
+) -> None:
+    """L1: при ошибке внутри L1 происходит тихий откат на L0 без падения."""
+    from app.blocks.priority import l1
+
+    def fail_score(*_args: Any, **_kwargs: Any) -> Any:
+        raise RuntimeError("Unexpected L1 computational failure")
+
+    monkeypatch.setattr(l1, "score", fail_score)
+
+    c = make_cluster("c_r001", [reports_map["r001"]])
+    p = priority.score(c, [reports_map["r001"]], [], base_context)
+    # L0 результат: SP и RC возвращают None
+    factors_map = {f.code: f.score for f in p.factors}
+    assert factors_map["SP"] is None
+    assert factors_map["RC"] is None
+    assert p.score > 0
+
+
+def test_l0_direct_invocation(
+    reports_map: dict[str, Report],
+    base_context: Context,
+) -> None:
+    """L0: прямой вызов l0.score возвращает уровень L0 (только HZ, DM, AG; остальные None)."""
+    from app.blocks.priority import l0
+
+    c = make_cluster("c_r001", [reports_map["r001"]])
+    p = l0.score(c, [reports_map["r001"]], [], base_context)
+    factors_map = {f.code: f.score for f in p.factors}
+    assert factors_map["SP"] is None
+    assert factors_map["VF"] is None
+    assert p.confidence == 0.55

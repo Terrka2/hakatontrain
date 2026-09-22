@@ -1,9 +1,9 @@
 """Блок D1 · База данных и репозиторий. Порт блока — только то, что объявлено в этом файле.
 
-Контракт: docs/contracts/D1_db.md. Реализация: l0.py (заглушка/L0), l1.py (целевой уровень).
+Контракт: docs/contracts/D1_db.md. Реализация: l0.py (без сети, L0), l1.py (целевой уровень).
 """
 
-import os
+import logging
 from datetime import datetime
 from typing import Protocol
 
@@ -17,6 +17,11 @@ from app.contracts.models import (
     Priority,
     Report,
 )
+from app.core.config import settings
+
+from . import l0, l1
+
+log = logging.getLogger(__name__)
 
 
 class Repository(Protocol):
@@ -48,11 +53,11 @@ class Repository(Protocol):
 
 
 def get_repository() -> Repository:
-    """Возвращает репозиторий согласно настройке USE_MOCK (по умолчанию L0/MemoryRepository)."""
-    use_mock_str = os.getenv("USE_MOCK", "true").lower()
-    use_mock = use_mock_str in ("true", "1", "yes")
-    if use_mock:
-        from app.db.l0 import MemoryRepository
-
-        return MemoryRepository()
-    raise NotImplementedError("D1: L1 SqlRepository еще не реализован")
+    """Единая точка входа. Уровень выбирается переключателем USE_MOCK."""
+    if settings.USE_MOCK:
+        return l0.repo
+    try:
+        return l1.repo
+    except Exception:  # noqa: BLE001 — любая ошибка L1 = тихий откат на L0, не падение
+        log.warning("D1: L1 failed, falling back to L0", exc_info=True)
+        return l0.repo

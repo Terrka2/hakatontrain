@@ -26,10 +26,16 @@ def reset_state() -> None:
     t0 = datetime(2026, 9, 22, 8, 0, tzinfo=UTC)
     t_arr, t_dep = t0.replace(day=26, minute=30), t0.replace(day=26, hour=9)
 
-    b_rids = ["r007", "r008", "r009", "r010"]
     specs = [
         ("c1", "job_c1_1", "cl_001", "pothole", ["r001", "r002", "r003"], "road"),
-        ("c1", "job_c1_2", "cl_batch", "pothole", b_rids, "road"),
+        (
+            "c1",
+            "job_c1_2",
+            "cl_batch",
+            "pothole",
+            ["r007", "r008", "r009", "r010"],
+            "road",
+        ),
         ("c2", "job_c2_1", "cl_004", "streetlight", ["r004"], "electric"),
         ("c2", "job_c2_2", "cl_014", "tree", ["r014"], "green"),
     ]
@@ -98,6 +104,34 @@ def get_crew_route(crew_id: str) -> models.CrewRoute | None:
     return None
 
 
+def validate_update(route_crew_id: str, curr: str, update: models.JobUpdate) -> None:
+    if update.crew_id != route_crew_id:
+        raise HTTPException(
+            403, f"Бригада {update.crew_id} не может менять остановку {route_crew_id}"
+        )
+    nxt = update.status
+    if not (
+        (curr == "pending" and nxt != "done")
+        or (curr == "arrived" and nxt != "arrived")
+    ):
+        raise HTTPException(409, f"Недопустимый переход: {curr} -> {nxt}")
+    if nxt == "done" and not (update.photo_url and update.photo_url.strip()):
+        raise HTTPException(422, "Для done обязательно photo_url")
+    if nxt == "failed" and not update.reason:
+        raise HTTPException(422, "Для failed обязательно reason")
+    if update.reason == "needs_other_skill" and not update.needs_skill:
+        raise HTTPException(422, "Для needs_other_skill нужен needs_skill")
+
+
+def trigger_operator(update: models.JobUpdate) -> None:
+    from app.blocks import operator
+
+    try:
+        operator.operator_run("job_update", update.at, job_update=update)
+    except NotImplementedError:
+        pass
+
+
 def apply_update(update: models.JobUpdate) -> models.RouteStop:
     """Применяет обновление статуса остановки, валидирует переход и побочные эффекты."""
     if not _plan or _plan.status != "approved":
@@ -107,39 +141,18 @@ def apply_update(update: models.JobUpdate) -> models.RouteStop:
     if not pair:
         raise HTTPException(404, f"Остановка {update.job_id} не найдена")
     route, stop = pair[0]
-    if update.crew_id != route.crew_id:
-        raise HTTPException(
-            403, f"Бригада {update.crew_id} не может менять остановку {route.crew_id}"
-        )
+    validate_update(route.crew_id, stop.status, update)
 
-    curr, nxt = stop.status, update.status
-    valid = (curr == "pending" and nxt != "done") or (
-        curr == "arrived" and nxt != "arrived"
-    )
-    if not valid:
-        raise HTTPException(409, f"Недопустимый переход: {curr} -> {nxt}")
-    if nxt == "done" and not (update.photo_url and update.photo_url.strip()):
-        raise HTTPException(422, "Для done обязательно photo_url")
-    if nxt == "failed" and not update.reason:
-        raise HTTPException(422, "Для failed обязательно reason")
-    if update.reason == "needs_other_skill" and not update.needs_skill:
-        raise HTTPException(422, "Для needs_other_skill нужен needs_skill")
-
-    stop.status = nxt
-    if nxt == "done" and update.job_id in _jobs:
+    stop.status = update.status
+    if update.status == "done" and update.job_id in _jobs:
         for cid in _jobs[update.job_id].cluster_ids:
             if c := _clusters.get(cid):
                 c.status = "resolved"
                 for rid in c.report_ids:
                     if r := _reports.get(rid):
                         r.status = "resolved"
-    elif nxt == "failed":
-        from app.blocks import operator
-
-        try:
-            operator.operator_run("job_update", update.at, job_update=update)
-        except NotImplementedError:
-            pass
+    elif update.status == "failed":
+        trigger_operator(update)
     return stop.model_copy(deep=True)
 
 

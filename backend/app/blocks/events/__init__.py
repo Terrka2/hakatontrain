@@ -5,18 +5,19 @@
 
 from datetime import datetime
 
+from app.blocks.events import l0
 from app.contracts.models import Cluster, Context, Decision, Event, Job
 
 
 def get_events(start: datetime, end: datetime) -> list[Event]:
-    raise NotImplementedError("X1: реализуй по контракту docs/contracts/X1_events.md")
+    return l0.get_events(start, end)
 
 
 def enrich_context(ctx: Context) -> Context:
-    raise NotImplementedError("X1: реализуй по контракту docs/contracts/X1_events.md")
+    return l0.enrich_context(ctx)
 
 
 def apply_deadlines(
     jobs: list[Job], clusters: list[Cluster], events: list[Event]
 ) -> tuple[list[Job], list[Decision]]:
-    raise NotImplementedError("X1: реализуй по контракту docs/contracts/X1_events.md")
+    return l0.apply_deadlines(jobs, clusters, events)

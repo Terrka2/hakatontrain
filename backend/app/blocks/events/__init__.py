@@ -1,6 +1,6 @@
 """Блок X1 · Мероприятия (дополнительный). Порт блока — только то, что объявлено в этом файле.
 
-Контракт: docs/contracts/X1_events.md. Реализация: l0.py (заглушка), l1.py (целевой уровень).
+Контракт: docs/contracts/X1_events.md. Реализация: l0.py (заглушка), l1.py (D1), l2.py (внешний API).
 """
 
 import logging
@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from app.blocks.events import l0, l1
+from app.blocks.events import l0, l1, l2
 from app.contracts.models import Cluster, Context, Decision, Event, Job
 from app.core.config import settings
 
@@ -32,7 +32,38 @@ def _call[T](
 
 
 def get_events(start: datetime, end: datetime, repo: Any = None) -> list[Event]:
-    return _call("get_events", l1.get_events, l0.get_events, start, end, repo=repo)
+    if settings.USE_MOCK:
+        return l0.get_events(start, end)
+
+    # 1. Попытка L2 (внешний API)
+    try:
+        events = l2.fetch_external_events(start, end)
+        if events:
+            return events
+        log.warning(
+            "X1: L2 fetch_external_events returned empty list, falling back to L1",
+            exc_info=False,
+        )
+    except Exception:
+        log.warning(
+            "X1: L2 fetch_external_events failed, falling back to L1", exc_info=True
+        )
+
+    # 2. Попытка L1 (БД через репозиторий D1)
+    try:
+        events = l1.get_events(start, end, repo=repo)
+        if events:
+            return events
+        log.warning(
+            "X1: L1 get_events returned empty list, falling back to L0", exc_info=False
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        log.warning("X1: L1 get_events failed, falling back to L0", exc_info=True)
+
+    # 3. Откат на L0 (демо-фикстура)
+    return l0.get_events(start, end)
 
 
 def add_event(event: Event, repo: Any = None) -> Event:

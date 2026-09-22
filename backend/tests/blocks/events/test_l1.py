@@ -21,7 +21,7 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def _reset_state() -> Generator[None]:
+def _reset_state(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     from app.api.routes.events import router as events_router
 
     if not any(
@@ -31,6 +31,9 @@ def _reset_state() -> Generator[None]:
         app.include_router(events_router, prefix=settings.API_V1_STR)
     app.dependency_overrides.clear()
     l0.reset_state()
+    monkeypatch.setattr(
+        "app.blocks.events.l2.fetch_external_events", lambda *_a, **_kw: []
+    )
     yield
     app.dependency_overrides.clear()
     l0.reset_state()

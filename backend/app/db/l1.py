@@ -1,21 +1,25 @@
 """Уровень L1 блока D1: SqlRepository на PostgreSQL/SQLModel (в разработке).
 
-На этапе L0 модуль предоставляет заглушку repo, выбрасывающую NotImplementedError,
-для проверки безопасного отката (fallback) порта на l0.repo при любых сбоях.
+Заглушка: любой вызов метода кидает NotImplementedError, чтобы порт в __init__.py
+мог перехватить исключение и безопасно откатиться на L0.
 """
 
 from typing import Any
 
 
 class SqlRepository:
-    """Заглушка реализации SqlRepository (L1)."""
+    """Заглушка реализации SqlRepository (L1): любой вызов метода кидает NotImplementedError."""
 
-    def __init__(self) -> None:
-        raise NotImplementedError("D1: L1 SqlRepository еще не реализован")
+    def __getattribute__(self, name: str) -> Any:
+        if name.startswith("__") and name.endswith("__"):
+            return super().__getattribute__(name)
+        raise NotImplementedError(f"D1: L1 SqlRepository.{name} еще не реализован")
+
+    def __getattr__(self, name: str) -> Any:
+        raise NotImplementedError(f"D1: L1 SqlRepository.{name} еще не реализован")
 
 
 def __getattr__(name: str) -> Any:
     if name == "repo":
         raise NotImplementedError("D1: L1 SqlRepository еще не реализован")
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-

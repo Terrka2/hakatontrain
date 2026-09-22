@@ -284,7 +284,7 @@ BLOCKS = [
  dict(id="C0", name="skeleton", title="Каркас проекта", group="CORE", owner="Z", backup="N", reviewer="N", branch="dev",
   depends=[], consumers=["все блоки"],
   goal="Импортировать `fastapi/full-stack-fastapi-template` (MIT) в репозиторий и подготовить пустые «гнёзда» для всех блоков, чтобы дальше никто не трогал общие файлы.",
-  paths=["backend/**", "frontend/**", "docker-compose*.yml", ".env.example", "README.md", ".github/workflows/**", "scripts/**"],
+  paths=["backend/**", "frontend/**", "compose*.yml", "docker-compose*.yml", ".env.example", "README.md", ".github/workflows/**", "scripts/**"],
   models=[],
   port="""\
 Результат — не функция, а состояние репозитория:

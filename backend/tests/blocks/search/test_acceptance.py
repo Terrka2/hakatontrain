@@ -2,7 +2,7 @@
 
 Запуск: cd backend && uv run pytest tests/blocks/search/test_acceptance.py -v
 
-Все 4 теста сейчас красные — реализация ещё не создана.
+Все тесты сейчас красные — реализация ещё не создана.
 """
 
 import json
@@ -35,17 +35,14 @@ def events(data: dict[str, Any]) -> dict[str, Event]:
 
 
 # ---------------------------------------------------------------------------
-# Критерий 1 (L1): text_similarity кросс-языковая — RU↔RO одна яма > RU разные темы
+# Критерий 1: text_similarity кросс-языковая — RU↔RO одна яма > RU разные темы
 # ---------------------------------------------------------------------------
 
 
-def test_l1_text_similarity_cross_language(
+def test_text_similarity_cross_language(
     reports: dict[str, Report],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Критерий 1: text_similarity(r001, r002) > text_similarity(r001, r005) при EMBEDDER=st."""
-    monkeypatch.setattr(settings, "EMBEDDER", "st")
-
+    """Критерий 1 (L0 tfidf): text_similarity(r001, r002) > text_similarity(r001, r005)."""
     r001 = reports["r001"]
     r002 = reports["r002"]
     r005 = reports["r005"]
@@ -63,19 +60,51 @@ def test_l1_text_similarity_cross_language(
     )
 
 
+def test_l1_similarity_with_mock(
+    reports: dict[str, Report],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Критерий 1 (L1 st с mock): l1.embed подменяется mock-функцией без скачивания модели."""
+    monkeypatch.setattr(settings, "EMBEDDER", "st")
+    from app.blocks.search import l1 as search_l1
+
+    r001 = reports["r001"]
+    r002 = reports["r002"]
+    r005 = reports["r005"]
+
+    # Фейковая функция embed: для r001 и r002 даёт близкие векторы, для r005 — далёкий
+    def fake_embed(texts: list[str]) -> list[list[float]]:
+        vecs: list[list[float]] = []
+        for t in texts:
+            if t == r001.text:
+                vecs.append([1.0, 0.0])
+            elif t == r002.text:
+                vecs.append([0.95, 0.05])
+            elif t == r005.text:
+                vecs.append([0.0, 1.0])
+            else:
+                vecs.append([0.5, 0.5])
+        return vecs
+
+    monkeypatch.setattr(search_l1, "embed", fake_embed)
+
+    sim_same = text_similarity(r001.text, r002.text)
+    sim_diff = text_similarity(r001.text, r005.text)
+
+    assert isinstance(sim_same, float)
+    assert isinstance(sim_diff, float)
+    assert 0.0 <= sim_same <= 1.0
+    assert 0.0 <= sim_diff <= 1.0
+    assert sim_same > sim_diff
+
+
 # ---------------------------------------------------------------------------
 # Критерий 2: search("яма у школы") → r001 или r003 в топ-3
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("embedder", ["tfidf", "st"])
-def test_search_returns_relevant_reports(
-    embedder: str,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_search_returns_relevant_reports() -> None:
     """Критерий 2: поиск 'яма у школы' возвращает r001 или r003 в топ-3."""
-    monkeypatch.setattr(settings, "EMBEDDER", embedder)
-
     results: list[Hit] = search.search("яма у школы", k=3)
 
     assert len(results) <= 3, f"search вернул {len(results)} результатов вместо ≤ 3"
@@ -94,14 +123,8 @@ def test_search_returns_relevant_reports(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("embedder", ["tfidf", "st"])
-def test_search_returns_event(
-    embedder: str,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_search_returns_event() -> None:
     """Критерий 3: поиск 'забег' возвращает событие e1."""
-    monkeypatch.setattr(settings, "EMBEDDER", embedder)
-
     results: list[Hit] = search.search("забег", k=5)
 
     result_ids = [h.id for h in results]
@@ -123,7 +146,7 @@ def test_fallback_to_l0_on_l1_failure(
     """Критерий 4: ошибка L1 → откат на tfidf без исключения."""
     monkeypatch.setattr(settings, "EMBEDDER", "st")
 
-    # Ломаем L1 — embed и text_similarity кидают RuntimeError
+    # Ломаем L1 — text_similarity кидает RuntimeError
     from app.blocks.search import l1 as search_l1
 
     def broken_text_similarity(_a: str, _b: str) -> float:

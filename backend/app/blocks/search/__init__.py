@@ -4,22 +4,15 @@
 """
 
 import logging
-from typing import Literal
-
-from pydantic import BaseModel
 
 from app.core.config import settings
 
 from . import l0, l1
+from .models import Hit
 
 log = logging.getLogger(__name__)
 
-
-class Hit(BaseModel):
-    kind: Literal["report", "event"]
-    id: str
-    score: float
-    snippet: str
+__all__ = ["Hit", "embed", "search", "text_similarity"]
 
 
 def embed(texts: list[str]) -> list[list[float]]:

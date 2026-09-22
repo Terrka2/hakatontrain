@@ -379,3 +379,184 @@ def test_qa_fallback_to_l0_on_l1_failure(
     res = ingest.parse_file(sample_file)
     assert len(res.reports) == 1
     assert res.reports[0].id == "f1"
+
+
+# ==============================================================================
+# 4. Тесты уровня L1 (маппинг, синонимы RO/RU/EN, fallback)
+# ==============================================================================
+
+
+def test_l1_all_8_categories_resolved_from_ro_ru_en() -> None:
+    """L1: Проверка приведения категорий на румынском, русском и английском к CATEGORIES."""
+    cases = [
+        # pothole
+        ("groapă", "pothole"),
+        ("groapa", "pothole"),
+        ("яма", "pothole"),
+        ("выбоина", "pothole"),
+        ("road_damage", "pothole"),
+        # streetlight
+        ("felinar", "streetlight"),
+        ("iluminat_stradal", "streetlight"),
+        ("освещение", "streetlight"),
+        ("уличный_фонарь", "streetlight"),
+        ("lighting", "streetlight"),
+        # garbage
+        ("gunoi", "garbage"),
+        ("deșeuri", "garbage"),
+        ("deseuri", "garbage"),
+        ("мусор", "garbage"),
+        ("свалка", "garbage"),
+        ("trash", "garbage"),
+        # manhole
+        ("gura_de_canal", "manhole"),
+        ("gură_de_canal", "manhole"),
+        ("люк", "manhole"),
+        ("открытый_люк", "manhole"),
+        ("sewer_cover", "manhole"),
+        # tree
+        ("copac", "tree"),
+        ("creangă_căzută", "tree"),
+        ("дерево", "tree"),
+        ("ветка", "tree"),
+        ("fallen_tree", "tree"),
+        # water_leak
+        ("scurgere_apa", "water_leak"),
+        ("țeavă_spartă", "water_leak"),
+        ("утечка_воды", "water_leak"),
+        ("прорыв_трубы", "water_leak"),
+        ("pipe_burst", "water_leak"),
+        # traffic_sign
+        ("indicator_rutier", "traffic_sign"),
+        ("semafor", "traffic_sign"),
+        ("дорожный_знак", "traffic_sign"),
+        ("светофор", "traffic_sign"),
+        ("traffic_light", "traffic_sign"),
+        # public_space
+        ("spatiu_public", "public_space"),
+        ("teren_de_joacă", "public_space"),
+        ("сквер", "public_space"),
+        ("скамейка", "public_space"),
+        ("playground", "public_space"),
+    ]
+
+    for raw_cat, expected in cases:
+        resolved = ingest.l1.resolve_category(raw_cat)
+        assert resolved == expected, (
+            f"Expected '{expected}' for '{raw_cat}', got '{resolved}'"
+        )
+
+
+def test_l1_csv_parsing_with_default_mapping_yaml(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """L1: CSV парсится с базовым mapping.yaml и синонимами без явной передачи mapping."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+
+    csv_data = (
+        "identificator,tip,descriere,latitudine,longitudine,locatie_adresa\n"
+        "ro_01,groapa,Groapa adanca pe drum,47.012,28.825,str. Mateevici 10\n"
+        "ru_01,открытый_люк,Крышка люка отсутствует,47.013,28.826,ул. Пушкина 5\n"
+        "en_01,trash,Overflowing garbage bin,47.014,28.827,Main St 1\n"
+    )
+    f = tmp_path / "l1_test.csv"
+    f.write_text(csv_data, encoding="utf-8")
+
+    result = ingest.parse_file(f)
+    assert len(result.rejected) == 0
+    assert len(result.reports) == 3
+
+    r1, r2, r3 = result.reports
+    assert r1.id == "ro_01"
+    assert r1.category == "pothole"
+    assert r1.location.lat == 47.012
+    assert r1.address == "str. Mateevici 10"
+
+    assert r2.id == "ru_01"
+    assert r2.category == "manhole"
+    assert r2.text == "Крышка люка отсутствует"
+
+    assert r3.id == "en_01"
+    assert r3.category == "garbage"
+
+
+def test_l1_json_parsing_with_rejected_rows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """L1: JSON с некорректными записями добавляет строки в rejected с указанием причины."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+
+    json_data = [
+        {
+            "id": "valid_1",
+            "категория": "яма",
+            "текст": "Выбоина на дороге",
+            "широта": 47.05,
+            "долгота": 28.88,
+        },
+        {
+            "id": "no_coords",
+            "категория": "мусор",
+            "текст": "Куча мусора",
+            "широта": None,
+            "долгота": None,
+        },
+        {
+            "id": "unknown_cat",
+            "категория": "космический_корабль",
+            "текст": "НЛО приземлилось",
+            "широта": 47.06,
+            "долгота": 28.89,
+        },
+    ]
+    f = tmp_path / "l1_test.json"
+    f.write_text(json.dumps(json_data), encoding="utf-8")
+
+    result = ingest.parse_file(f)
+    assert len(result.reports) == 1
+    assert result.reports[0].id == "valid_1"
+    assert result.reports[0].category == "pothole"
+
+    assert len(result.rejected) == 2
+    rej_rows = {item["row"]: item["reason"] for item in result.rejected}
+    assert 2 in rej_rows
+    assert "Missing coordinates" in rej_rows[2]
+    assert 3 in rej_rows
+    assert "Unknown category" in rej_rows[3]
+
+
+def test_l1_normalize_raises_clear_value_error() -> None:
+    """L1: normalize() выбрасывает понятный ValueError при некорректных данных."""
+    # Неизвестная категория
+    with pytest.raises(ValueError, match="Unknown category"):
+        ingest.l1.normalize(
+            {
+                "id": "err1",
+                "category": "unknown_nonsense",
+                "text": "Текст",
+                "lat": 47.0,
+                "lon": 28.0,
+            }
+        )
+
+    # Отсутствуют координаты
+    with pytest.raises(ValueError, match="Missing coordinates"):
+        ingest.l1.normalize(
+            {
+                "id": "err2",
+                "category": "pothole",
+                "text": "Текст",
+            }
+        )
+
+    # Пустой текст
+    with pytest.raises(ValueError, match="Missing or empty report text"):
+        ingest.l1.normalize(
+            {
+                "id": "err3",
+                "category": "pothole",
+                "text": "   ",
+                "lat": 47.0,
+                "lon": 28.0,
+            }
+        )

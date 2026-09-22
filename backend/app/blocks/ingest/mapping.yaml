@@ -1,0 +1,66 @@
+# backend/app/blocks/ingest/mapping.yaml
+# Маппинг колонок входящих датасетов (RO / RU / EN) в канонические поля Report
+
+identificator: id
+identifier: id
+id_cerere: id
+номер: id
+
+categorie: category
+category: category
+tip: category
+категория: category
+тип: category
+
+descriere: text
+description: text
+text: text
+mesaj: text
+detalii: text
+текст: text
+описание: text
+жалоба: text
+
+latitudine: lat
+latitude: lat
+lat: lat
+coord_y: lat
+широта: lat
+
+longitudine: lon
+longitude: lon
+lon: lon
+coord_x: lon
+долгота: lon
+
+adresa: address
+address: address
+locatie_adresa: address
+адрес: address
+
+foto: photo_url
+photo: photo_url
+photo_url: photo_url
+url_foto: photo_url
+imagine: photo_url
+фото: photo_url
+снимок: photo_url
+
+data: created_at
+date: created_at
+created_at: created_at
+data_crearii: created_at
+timestamp: created_at
+дата: created_at
+создано: created_at
+
+statut: status
+status: status
+stare: status
+статус: status
+состояние: status
+
+confirmari: confirmations
+confirmations: confirmations
+aprecieri: confirmations
+подтверждения: confirmations

@@ -16,6 +16,20 @@ from app.contracts.models import (
     Report,
 )
 
+from . import l0
+from .l0 import get_cluster, get_clusters, get_plan, get_runs, review_cluster
+
+__all__ = [
+    "PipelineResult",
+    "run_pipeline",
+    "operator_run",
+    "get_cluster",
+    "get_clusters",
+    "get_plan",
+    "get_runs",
+    "review_cluster",
+]
+
 
 class PipelineResult(BaseModel):
     clusters: list[Cluster]
@@ -24,10 +38,10 @@ class PipelineResult(BaseModel):
 
 
 def run_pipeline(reports: list[Report], now: datetime) -> PipelineResult:
-    raise NotImplementedError("B0: реализуй по контракту docs/contracts/B0_operator.md")
+    return l0.run_pipeline(reports, now)
 
 
 def operator_run(
     trigger: str, now: datetime, job_update: JobUpdate | None = None
 ) -> OperatorRun:
-    raise NotImplementedError("B0: реализуй по контракту docs/contracts/B0_operator.md")
+    return l0.operator_run(trigger, now, job_update)

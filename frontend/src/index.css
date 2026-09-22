@@ -1,54 +1,107 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* ─── F6 · Дизайн-система ────────────────────────────────────────────────── */
+/* Шрифт: system-ui → Inter (уже в CDN через vite/html), фолбэк — sans-serif  */
+@layer base {
+  :root {
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
+/* ─── Tailwind @theme: алиасы CSS-переменных ────────────────────────────── */
 @theme inline {
+  /* радиусы */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
+
+  /* тени */
+  --shadow-card:   var(--shadow-card-val);
+  --shadow-badge:  var(--shadow-badge-val);
+  --shadow-dialog: var(--shadow-dialog-val);
+
+  /* базовые цвета shadcn */
+  --color-background:         var(--background);
+  --color-foreground:         var(--foreground);
+  --color-card:               var(--card);
+  --color-card-foreground:    var(--card-foreground);
+  --color-popover:            var(--popover);
   --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
+  --color-primary:            var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
+  --color-secondary:          var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --color-muted:              var(--muted);
+  --color-muted-foreground:   var(--muted-foreground);
+  --color-accent:             var(--accent);
+  --color-accent-foreground:  var(--accent-foreground);
+  --color-destructive:        var(--destructive);
+  --color-border:             var(--border);
+  --color-input:              var(--input);
+  --color-ring:               var(--ring);
+  --color-chart-1:            var(--chart-1);
+  --color-chart-2:            var(--chart-2);
+  --color-chart-3:            var(--chart-3);
+  --color-chart-4:            var(--chart-4);
+  --color-chart-5:            var(--chart-5);
+  --color-sidebar:                      var(--sidebar);
+  --color-sidebar-foreground:           var(--sidebar-foreground);
+  --color-sidebar-primary:              var(--sidebar-primary);
+  --color-sidebar-primary-foreground:   var(--sidebar-primary-foreground);
+  --color-sidebar-accent:               var(--sidebar-accent);
+  --color-sidebar-accent-foreground:    var(--sidebar-accent-foreground);
+  --color-sidebar-border:               var(--sidebar-border);
+  --color-sidebar-ring:                 var(--sidebar-ring);
+
+  /* F6: приоритет (светлая) — алиасы для Tailwind-классов */
+  --color-priority-high:          var(--priority-high);
+  --color-priority-high-fg:       var(--priority-high-fg);
+  --color-priority-medium:        var(--priority-medium);
+  --color-priority-medium-fg:     var(--priority-medium-fg);
+  --color-priority-low:           var(--priority-low);
+  --color-priority-low-fg:        var(--priority-low-fg);
+
+  /* F6: статусы */
+  --color-status-open:       var(--status-open);
+  --color-status-open-fg:    var(--status-open-fg);
+  --color-status-in-progress:    var(--status-in-progress);
+  --color-status-in-progress-fg: var(--status-in-progress-fg);
+  --color-status-done:       var(--status-done);
+  --color-status-done-fg:    var(--status-done-fg);
+  --color-status-rejected:   var(--status-rejected);
+  --color-status-rejected-fg: var(--status-rejected-fg);
+
+  /* F6: бригады */
+  --color-crew-alpha:    var(--crew-alpha);
+  --color-crew-alpha-fg: var(--crew-alpha-fg);
+  --color-crew-beta:     var(--crew-beta);
+  --color-crew-beta-fg:  var(--crew-beta-fg);
+  --color-crew-gamma:    var(--crew-gamma);
+  --color-crew-gamma-fg: var(--crew-gamma-fg);
 }
 
+/* ─── Светлая тема (:root) ───────────────────────────────────────────────── */
 :root {
-  --radius: 0.625rem;
+  /* геометрия */
+  --radius: 0.5rem;
+
+  /* тени */
+  --shadow-card-val:   0 1px 3px oklch(0 0 0 / 8%), 0 1px 2px oklch(0 0 0 / 6%);
+  --shadow-badge-val:  0 1px 2px oklch(0 0 0 / 10%);
+  --shadow-dialog-val: 0 10px 40px oklch(0 0 0 / 15%), 0 2px 10px oklch(0 0 0 / 8%);
+
+  /* shadcn base */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
+  /* primary — фирменный тёмно-бирюзовый (бренд городского сервиса) */
   --primary: oklch(0.5982 0.10687 182.4689);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
@@ -74,9 +127,45 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* ── F6: бейджи приоритета (светлая тема) ─────────────────────────────── */
+  /* high  → тёмно-красный фон, белый текст  — контраст ≥ 4.5:1 */
+  --priority-high:    oklch(0.45 0.22 27);
+  --priority-high-fg: oklch(0.98 0 0);
+  /* medium → тёмно-янтарный фон, белый текст — контраст ≥ 4.5:1 */
+  --priority-medium:    oklch(0.52 0.15 65);
+  --priority-medium-fg: oklch(0.98 0 0);
+  /* low → тёмно-зелёный фон, белый текст — контраст ≥ 4.5:1 */
+  --priority-low:    oklch(0.42 0.13 150);
+  --priority-low-fg: oklch(0.98 0 0);
+
+  /* ── F6: статусы ──────────────────────────────────────────────────────── */
+  --status-open:           oklch(0.48 0.14 230);
+  --status-open-fg:        oklch(0.98 0 0);
+  --status-in-progress:    oklch(0.52 0.15 65);
+  --status-in-progress-fg: oklch(0.98 0 0);
+  --status-done:           oklch(0.42 0.13 150);
+  --status-done-fg:        oklch(0.98 0 0);
+  --status-rejected:       oklch(0.48 0.05 0);
+  --status-rejected-fg:    oklch(0.98 0 0);
+
+  /* ── F6: бригады ─────────────────────────────────────────────────────── */
+  --crew-alpha:    oklch(0.48 0.14 230);
+  --crew-alpha-fg: oklch(0.98 0 0);
+  --crew-beta:     oklch(0.50 0.16 300);
+  --crew-beta-fg:  oklch(0.98 0 0);
+  --crew-gamma:    oklch(0.46 0.18 170);
+  --crew-gamma-fg: oklch(0.98 0 0);
 }
 
+/* ─── Тёмная тема (.dark) ────────────────────────────────────────────────── */
 .dark {
+  /* тени в тёмной теме (светящиеся, приглушённые) */
+  --shadow-card-val:   0 1px 3px oklch(0 0 0 / 40%), 0 1px 2px oklch(0 0 0 / 30%);
+  --shadow-badge-val:  0 1px 2px oklch(0 0 0 / 40%);
+  --shadow-dialog-val: 0 10px 40px oklch(0 0 0 / 60%), 0 2px 10px oklch(0 0 0 / 40%);
+
+  /* shadcn base */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -108,13 +197,44 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* ── F6: бейджи приоритета (тёмная тема) ─────────────────────────────── */
+  /* high → ярко-красный (насыщеннее для тёмного фона), контраст ≥ 4.5:1 */
+  --priority-high:    oklch(0.58 0.24 27);
+  --priority-high-fg: oklch(0.98 0 0);
+  /* medium → янтарный, контраст ≥ 4.5:1 */
+  --priority-medium:    oklch(0.62 0.17 65);
+  --priority-medium-fg: oklch(0.10 0 0);
+  /* low → зелёный, контраст ≥ 4.5:1 */
+  --priority-low:    oklch(0.55 0.15 150);
+  --priority-low-fg: oklch(0.10 0 0);
+
+  /* ── F6: статусы (тёмная тема) ────────────────────────────────────────── */
+  --status-open:           oklch(0.55 0.16 230);
+  --status-open-fg:        oklch(0.10 0 0);
+  --status-in-progress:    oklch(0.62 0.17 65);
+  --status-in-progress-fg: oklch(0.10 0 0);
+  --status-done:           oklch(0.55 0.15 150);
+  --status-done-fg:        oklch(0.10 0 0);
+  --status-rejected:       oklch(0.50 0.06 0);
+  --status-rejected-fg:    oklch(0.98 0 0);
+
+  /* ── F6: бригады (тёмная тема) ────────────────────────────────────────── */
+  --crew-alpha:    oklch(0.55 0.16 230);
+  --crew-alpha-fg: oklch(0.10 0 0);
+  --crew-beta:     oklch(0.58 0.18 300);
+  --crew-beta-fg:  oklch(0.10 0 0);
+  --crew-gamma:    oklch(0.54 0.20 170);
+  --crew-gamma-fg: oklch(0.10 0 0);
 }
 
+/* ─── Base layer ─────────────────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
+    font-family: var(--font-sans);
     @apply bg-background text-foreground;
   }
   button,

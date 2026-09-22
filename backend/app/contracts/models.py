@@ -207,6 +207,7 @@ class JobUpdate(BaseModel):
     ) = None  # для failed
     needs_skill: str | None = None  # для needs_other_skill: одно из SKILLS
     note: str | None = None
+    location: GeoPoint | None = None  # для геофенсинга в B8 L2
 
 
 class OperatorRun(BaseModel):

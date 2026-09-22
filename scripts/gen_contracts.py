@@ -7,6 +7,7 @@
 
 import ast
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -284,7 +285,7 @@ BLOCKS = [
  dict(id="C0", name="skeleton", title="Каркас проекта", group="CORE", owner="Z", backup="N", reviewer="N", branch="dev",
   depends=[], consumers=["все блоки"],
   goal="Импортировать `fastapi/full-stack-fastapi-template` (MIT) в репозиторий и подготовить пустые «гнёзда» для всех блоков, чтобы дальше никто не трогал общие файлы.",
-  paths=["backend/**", "frontend/**", "docker-compose*.yml", ".env.example", "README.md", ".github/workflows/**", "scripts/**"],
+  paths=["backend/**", "frontend/**", "compose*.yml", "docker-compose*.yml", ".env.example", "README.md", ".github/workflows/**", "scripts/**"],
   models=[],
   port="""\
 Результат — не функция, а состояние репозитория:
@@ -1131,13 +1132,20 @@ def write_team() -> None:
             f"| **{name}** | [`docs/team/{name}.md`]({name}.md) | `{branch}` | {', '.join(i for i, _ in order)} | "
             f"{', '.join(reviews) or '—'} | Арсений или Некит (не автор) |"
         )
+        # Отметки L0/L1 ставит агент после приёмки — при перегенерации их нужно сохранить.
+        marks: dict[str, tuple[str, str]] = {}
+        existing = out / f"{name}.md"
+        if existing.exists():
+            for m in re.finditer(r"^\| \d+ \| `([A-Z]\d)` \|.*\| (☐|✅) \| (☐|✅) \|$", existing.read_text(encoding="utf-8"), re.M):
+                marks[m.group(1)] = (m.group(2), m.group(3))
         blocks = []
         for i, (bid, when) in enumerate(order, 1):
             b = by_id[bid]
             assert b["owner"] == code, f"{bid}: владелец {b['owner']}, а в ROLES у {code}"
+            l0, l1 = marks.get(bid, ("☐", "☐"))
             blocks.append(
                 f"| {i} | `{bid}` | {b['title']} | {when} | [контракт](../contracts/{bid}_{b['name']}.md) | "
-                f"[доска](../status/{bid}.md) | [референсы](../references/{bid}/README.md) | ☐ | ☐ |"
+                f"[доска](../status/{bid}.md) | [референсы](../references/{bid}/README.md) | {l0} | {l1} |"
             )
         missing = [b["id"] for b in owned(code) if b["id"] not in {i for i, _ in order}]
         assert not missing, f"{name}: блоки {missing} не в порядке ROLES"

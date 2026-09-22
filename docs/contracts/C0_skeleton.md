@@ -51,6 +51,7 @@
 Можно создавать и менять ТОЛЬКО эти файлы:
 - `backend/**`
 - `frontend/**`
+- `compose*.yml`
 - `docker-compose*.yml`
 - `.env.example`
 - `README.md`

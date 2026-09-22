@@ -22,6 +22,7 @@
 ## Куда смотреть в каркасе
 - `backend/**`
 - `frontend/**`
+- `compose*.yml`
 - `docker-compose*.yml`
 - `.env.example`
 - `README.md`

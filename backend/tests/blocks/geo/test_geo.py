@@ -5,6 +5,7 @@
 """
 
 import json
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -20,13 +21,17 @@ FIXTURE_PATH = (
 
 
 @pytest.fixture(autouse=True)
-def disable_network(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Запрещает любые сетевые вызовы в тестах блока."""
+def disable_network(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
+    """Запрещает любые сетевые вызовы в тестах блока и очищает кэш геокодера."""
+    geo.l1.clear_cache()
 
     def forbidden(*_args: Any, **_kwargs: Any) -> None:
         raise RuntimeError("Network access forbidden in block tests")
 
     monkeypatch.setattr("urllib.request.urlopen", forbidden)
+    monkeypatch.setattr("socket.socket.connect", forbidden)
+    yield
+    geo.l1.clear_cache()
 
 
 @pytest.fixture
@@ -191,3 +196,133 @@ def test_qa_fallback_to_l0_on_l1_failure(monkeypatch: pytest.MonkeyPatch) -> Non
     # h3_cell должен тихо вернуть результат l0
     p = GeoPoint(lat=47.0, lon=28.0)
     assert geo.h3_cell(p) == geo.l0.h3_cell(p)
+
+
+# ==============================================================================
+# 4. Тесты уровня L1 (geopy Nominatim, кэш, ограничение Кишинёва, h3)
+# ==============================================================================
+
+
+class MockLocation:
+    def __init__(self, lat: float, lon: float) -> None:
+        self.latitude = lat
+        self.longitude = lon
+
+
+def test_l1_geocode_chisinau_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L1: успешное геокодирование адреса в Кишинёве через Nominatim."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setattr(settings, "GEOCODER", "nominatim")
+
+    def mock_geocode(_self: Any, query: str) -> Any:
+        if "Mateevici" in query:
+            return MockLocation(47.0182, 28.8422)
+        return None
+
+    monkeypatch.setattr("geopy.geocoders.Nominatim.geocode", mock_geocode)
+
+    res = geo.geocode("str. Alexei Mateevici 85, Chișinău")
+    assert res is not None
+    assert res.lat == 47.0182
+    assert res.lon == 28.8422
+
+
+def test_l1_geocode_outside_chisinau_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """L1: адреса за пределами bounding box Кишинёва возвращают None."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setattr(settings, "GEOCODER", "nominatim")
+
+    def mock_geocode(_self: Any, _query: str) -> Any:
+        return MockLocation(51.5074, -0.1278)
+
+    monkeypatch.setattr("geopy.geocoders.Nominatim.geocode", mock_geocode)
+
+    res = geo.geocode("Baker Street 221B, London")
+    assert res is None
+
+
+def test_l1_geocode_not_found_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L1: если адрес не найден Nominatim — возвращается None без исключения."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setattr(settings, "GEOCODER", "nominatim")
+
+    monkeypatch.setattr("geopy.geocoders.Nominatim.geocode", lambda _self, _q: None)
+
+    res = geo.geocode("Nonexistent Street 999")
+    assert res is None
+
+
+def test_l1_geocode_network_or_timeout_error_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """L1: ошибка сети или таймаут возвращает None без выброса исключения."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setattr(settings, "GEOCODER", "nominatim")
+
+    def mock_fail(_self: Any, _q: str) -> Any:
+        raise TimeoutError("Nominatim request timed out")
+
+    monkeypatch.setattr("geopy.geocoders.Nominatim.geocode", mock_fail)
+
+    res = geo.geocode("str. Pushkin 10, Chișinău")
+    assert res is None
+
+
+def test_l1_geocode_in_memory_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L1: повторные запросы к одному адресу возвращаются из кэша без вызова Nominatim."""
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setattr(settings, "GEOCODER", "nominatim")
+
+    calls = 0
+
+    def mock_geocode(_self: Any, _query: str) -> Any:
+        nonlocal calls
+        calls += 1
+        return MockLocation(47.0205, 28.8350)
+
+    monkeypatch.setattr("geopy.geocoders.Nominatim.geocode", mock_geocode)
+
+    addr = "bd. Stefan cel Mare 1, Chisinau"
+    p1 = geo.geocode(addr)
+    assert p1 is not None
+    assert calls == 1
+
+    p2 = geo.geocode(addr)
+    assert p2 is not None
+    assert p2.lat == p1.lat
+    assert p2.lon == p1.lon
+    assert calls == 1
+
+
+def test_l1_h3_cell_library() -> None:
+    """L1: h3_cell возвращает валидный строковый идентификатор ячейки H3."""
+    p = GeoPoint(lat=47.0182, lon=28.8422)
+    cell = geo.l1.h3_cell(p, res=9)
+    assert isinstance(cell, str)
+    assert len(cell) == 15
+    assert cell == geo.l1.h3_cell(p, res=9)
+
+
+def test_l1_geocoder_off_and_mock_switches(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Проверка переключателей GEOCODER=off и USE_MOCK=true."""
+    # При GEOCODER=off -> всегда L0 (None)
+    monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setattr(settings, "GEOCODER", "off")
+    assert geo.geocode("str. Alexei Mateevici 85") is None
+
+    # При USE_MOCK=true -> L0
+    monkeypatch.setattr(settings, "USE_MOCK", True)
+    monkeypatch.setattr(settings, "GEOCODER", "nominatim")
+    assert geo.geocode("str. Alexei Mateevici 85") is None
+
+    p = GeoPoint(lat=47.0182, lon=28.8422)
+    h3_l0 = geo.h3_cell(p, res=9)
+    assert "47.0182" in h3_l0
+
+
+def test_l1_empty_and_whitespace_address() -> None:
+    """L1: пустые строки или строки из пробелов возвращают None без запросов."""
+    assert geo.l1.geocode("") is None
+    assert geo.l1.geocode("   ") is None

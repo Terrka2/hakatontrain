@@ -60,7 +60,7 @@ def distance_to_polyline_m(p: GeoPoint, line: list[GeoPoint]) -> tuple[float, fl
 def geocode(address: str) -> GeoPoint | None:
     """Геокодирование адреса через Nominatim с кэшем и ограничением Кишинёва.
 
-    При любой ошибке сети, таймауте или выходе за границы Кишинёва возвращает None.
+    Исключения пробрасываются в __init__.py для логирования со стеком и отката на L0.
     """
     if not address or not address.strip():
         return None
@@ -69,25 +69,21 @@ def geocode(address: str) -> GeoPoint | None:
     if clean_address in _cache:
         return _cache[clean_address]
 
-    try:
-        geolocator = Nominatim(user_agent="citytriage_geo_l1", timeout=5)
-        location = geolocator.geocode(clean_address)
-        if location is None:
-            _cache[clean_address] = None
-            return None
-
-        lat = float(location.latitude)
-        lon = float(location.longitude)
-        if not is_in_chisinau(lat, lon):
-            _cache[clean_address] = None
-            return None
-
-        point = GeoPoint(lat=lat, lon=lon)
-        _cache[clean_address] = point
-        return point
-    except Exception as e:  # noqa: BLE001
-        log.warning("B2 L1 geocode error for address '%s': %s", clean_address, e)
+    geolocator = Nominatim(user_agent="citytriage_geo_l1", timeout=5)
+    location = geolocator.geocode(clean_address, country_codes="md")
+    if location is None:
+        _cache[clean_address] = None
         return None
+
+    lat = float(location.latitude)
+    lon = float(location.longitude)
+    if not is_in_chisinau(lat, lon):
+        _cache[clean_address] = None
+        return None
+
+    point = GeoPoint(lat=lat, lon=lon)
+    _cache[clean_address] = point
+    return point
 
 
 def h3_cell(p: GeoPoint, res: int = 9) -> str:

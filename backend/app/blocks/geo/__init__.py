@@ -35,7 +35,7 @@ def distance_to_polyline_m(p: GeoPoint, line: list[GeoPoint]) -> tuple[float, fl
 
 def geocode(address: str) -> GeoPoint | None:
     """Геокодирование адреса. При GEOCODER=off, USE_MOCK=true или ошибке L1 — откат на L0 (None)."""
-    if settings.GEOCODER == "off" or settings.USE_MOCK:
+    if settings.USE_MOCK or settings.GEOCODER == "off":
         return l0.geocode(address)
     try:
         return l1.geocode(address)

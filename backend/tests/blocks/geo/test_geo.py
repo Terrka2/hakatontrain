@@ -160,8 +160,9 @@ def test_qa_data_boundaries() -> None:
     p = GeoPoint(lat=47.0, lon=28.0)
     assert geo.haversine_m(p, p) == 0.0
 
-    # Пустая полилиния
-    assert geo.distance_to_polyline_m(p, []) == (0.0, 0.0)
+    # Пустая полилиния бросает ValueError("Empty line")
+    with pytest.raises(ValueError, match="Empty line"):
+        geo.distance_to_polyline_m(p, [])
 
     # Полилиния из 1 точки
     dist, along = geo.distance_to_polyline_m(p, [p])
@@ -210,11 +211,12 @@ class MockLocation:
 
 
 def test_l1_geocode_chisinau_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    """L1: успешное геокодирование адреса в Кишинёве через Nominatim."""
+    """L1: успешное геокодирование адреса в Кишинёве через Nominatim с country_codes='md'."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
     monkeypatch.setattr(settings, "GEOCODER", "nominatim")
 
-    def mock_geocode(_self: Any, query: str) -> Any:
+    def mock_geocode(_self: Any, query: str, **kwargs: Any) -> Any:
+        assert kwargs.get("country_codes") == "md"
         if "Mateevici" in query:
             return MockLocation(47.0182, 28.8422)
         return None
@@ -234,7 +236,8 @@ def test_l1_geocode_outside_chisinau_returns_none(
     monkeypatch.setattr(settings, "USE_MOCK", False)
     monkeypatch.setattr(settings, "GEOCODER", "nominatim")
 
-    def mock_geocode(_self: Any, _query: str) -> Any:
+    def mock_geocode(_self: Any, _query: str, **kwargs: Any) -> Any:
+        assert kwargs.get("country_codes") == "md"
         return MockLocation(51.5074, -0.1278)
 
     monkeypatch.setattr("geopy.geocoders.Nominatim.geocode", mock_geocode)
@@ -248,7 +251,9 @@ def test_l1_geocode_not_found_returns_none(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(settings, "USE_MOCK", False)
     monkeypatch.setattr(settings, "GEOCODER", "nominatim")
 
-    monkeypatch.setattr("geopy.geocoders.Nominatim.geocode", lambda _self, _q: None)
+    monkeypatch.setattr(
+        "geopy.geocoders.Nominatim.geocode", lambda _self, _q, **kw: None
+    )
 
     res = geo.geocode("Nonexistent Street 999")
     assert res is None
@@ -257,15 +262,20 @@ def test_l1_geocode_not_found_returns_none(monkeypatch: pytest.MonkeyPatch) -> N
 def test_l1_geocode_network_or_timeout_error_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """L1: ошибка сети или таймаут возвращает None без выброса исключения."""
+    """L1: ошибка сети или таймаут пробрасывается из l1.py и перехватывается в __init__.py с откатом на L0."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
     monkeypatch.setattr(settings, "GEOCODER", "nominatim")
 
-    def mock_fail(_self: Any, _q: str) -> Any:
+    def mock_fail(_self: Any, _q: str, **_kwargs: Any) -> Any:
         raise TimeoutError("Nominatim request timed out")
 
     monkeypatch.setattr("geopy.geocoders.Nominatim.geocode", mock_fail)
 
+    # 1. l1.geocode напрямую пробрасывает исключение без внутреннего try/except
+    with pytest.raises(TimeoutError, match="timed out"):
+        geo.l1.geocode("str. Pushkin 10, Chișinău")
+
+    # 2. geo.geocode (порт в __init__.py) ловит исключение, логирует и возвращает L0 (None)
     res = geo.geocode("str. Pushkin 10, Chișinău")
     assert res is None
 
@@ -277,7 +287,7 @@ def test_l1_geocode_in_memory_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
     calls = 0
 
-    def mock_geocode(_self: Any, _query: str) -> Any:
+    def mock_geocode(_self: Any, _query: str, **_kwargs: Any) -> Any:
         nonlocal calls
         calls += 1
         return MockLocation(47.0205, 28.8350)

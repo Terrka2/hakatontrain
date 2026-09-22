@@ -40,7 +40,7 @@ def within(center: GeoPoint, points: list[GeoPoint], radius_m: float) -> list[in
 def distance_to_polyline_m(p: GeoPoint, line: list[GeoPoint]) -> tuple[float, float]:
     """Вычисляет (кратчайшее расстояние до полилинии, расстояние от начала вдоль линии) в метрах."""
     if not line:
-        return (0.0, 0.0)
+        raise ValueError("Empty line")
     if len(line) == 1:
         return (haversine_m(p, line[0]), 0.0)
 

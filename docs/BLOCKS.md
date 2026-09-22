@@ -1,7 +1,7 @@
 # Блоки проекта — карта и статус
 
 Единое место, где видно: какие есть блоки, кто владелец, что от чего зависит и на каком уровне готовности каждый.
-Концепт — в [CONCEPT.md](CONCEPT.md). Контракт каждого блока — в [contracts/](contracts/). Процесс — в [WORKFLOW.md](WORKFLOW.md). Доски задач по блокам — в [status/](status/).
+Концепт — в [CONCEPT.md](CONCEPT.md). Контракт каждого блока — в [contracts/](contracts/). Процесс — в [WORKFLOW.md](WORKFLOW.md). Кто что делает и в какой ветке — в [team/](team/README.md). Доски задач по блокам — в [status/](status/), фиксированные образцы кода — в [references/](references/_patterns/README.md).
 
 ## Что из чего следует
 

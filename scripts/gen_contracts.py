@@ -21,6 +21,119 @@ PEOPLE = {
     "N": "Некит",
 }
 
+ROLES = {
+    # code: (pair-ветка, роль одним абзацем, порядок блоков с пометкой «когда»)
+    "A": ("pair/frontend",
+          "Интегратор и фронтенд. Собираю экраны руководителя и бригады, держу карту блоков и утверждаю merge. Ко мне идут с вопросами по контрактам и когда что-то не стыкуется между блоками.",
+          [("F1", "ядро"), ("F2", "ядро"), ("F3", "ядро"), ("F4", "ядро"), ("F5", "ядро"), ("F7", "только по команде Арсения")]),
+    "Z": ("pair/backend",
+          "Ядро бэкенда. Каркас, цикл оператора, склейка дубликатов, диспетчер маршрутов. Мои блоки — то, что остальные бэкенд-блоки вызывают, поэтому мои порты замораживаются первыми.",
+          [("C0", "сделан заранее — проверить и принять"), ("B0", "ядро"), ("B3", "ядро"), ("B6", "ядро"), ("B7", "только по команде Арсения")]),
+    "N": ("pair/llm",
+          "Данные и интеллект. База и репозиторий, эмбеддинги и поиск, всё, что зовёт LLM, инструменты оператора и MCP-сервер. Второй утверждающий merge.",
+          [("D1", "ядро"), ("D2", "ядро"), ("L1", "ядро"), ("L2", "ядро"), ("L3", "ядро")]),
+    "P": ("pair/backend",
+          "Бэкенд-блоки с чёткими входами и выходами: импорт данных, гео-утилиты, приоритет, контекст, работа бригад. Каждый блок — отдельная небольшая задача с готовыми тестами на fixture.",
+          [("B1", "ядро"), ("B2", "ядро"), ("B4", "ядро"), ("B5", "ядро"), ("B8", "ядро"), ("X1", "только по команде Арсения")]),
+    "D": ("pair/frontend",
+          "Дизайн-система и внешний вид. Токены, бейджи, иконки, пустые и ошибочные состояния, проход по всем экранам глазами обычного человека. Логику не трогаю.",
+          [("F6", "ядро")]),
+}
+
+TEAM_README = """\
+# Команда CityTriage: кто что делает
+
+> **Шаблон для нейронки.** Скопируй в чат этот файл и допиши одну строку:
+> `Я — <Имя>. Найди мою строку в таблице, открой мой файл docs/team/<Имя>.md и первый контракт из моего порядка. Работай как планировщик по инструкции из контракта.`
+> CLI-агенту (Antigravity / Codex / Claude Code) достаточно фразы: `Я — <Имя>, читай docs/team/<Имя>.md и AGENTS.md`.
+
+| Кто | Файл | Ветка | Блоки по порядку | Первое ревью делает | Одобряет merge |
+|---|---|---|---|---|---|
+{rows}
+
+## Как всё устроено за одну минуту
+- Каждый блок = один контракт `docs/contracts/<ID>_*.md` + доска задач `docs/status/<ID>.md` + фиксированные референсы `docs/references/<ID>/`.
+- Ты работаешь в **своей pair-ветке**. Под каждый блок и уровень — ветка `feat/<ID>-<кратко>` от неё. PR — в pair-ветку.
+- Две нейронки: **планировщик** (ChatGPT, нет — Qwen) режет контракт на короткие задачи и ведёт доску; **CLI-агент** пишет код по одной задаче. Ты между ними: копируешь задачу агенту, результат проверки — планировщику.
+- Агент после каждой закрытой задачи обновляет `docs/status/<ID>.md`. Когда все ✅ — пишет туда «Отчёт» и отмечает уровень в твоём `docs/team/<Имя>.md`. Дальше PR, ревью, merge.
+- Проблемы совместимости между блоками на merge — нормально. Чиним в feat-ветке, не в pair и не в dev.
+
+## Старт (10 минут)
+```
+git clone https://github.com/Terrka2/hakatontrain.git && cd hakatontrain
+git config core.hooksPath hooks
+git checkout <твоя pair-ветка>
+cd backend && uv sync && cd ../frontend && bun install && cd ..     # нет bun — npm i -g bun
+```
+Дальше — по своему файлу `docs/team/<Имя>.md`.
+"""
+
+PERSON_TEMPLATE = """\
+# {name}: роль, ветка, блоки
+
+> Скопируй этот файл в нейронку первым сообщением. Вторым — контракт текущего блока целиком.
+
+## Роль в проекте
+{role}
+
+## Ветка
+Рабочая ветка: **`{branch}`**. Под каждый блок и уровень: `git checkout {branch} && git pull && git checkout -b feat/<ID>-<кратко>`. PR открываешь в `{branch}`. В `dev` и `main` напрямую — нельзя.
+
+## Мои блоки по порядку
+| # | Блок | Что | Когда | Контракт | Доска | Референсы | L0 | L1 |
+|---|---|---|---|---|---|---|---|---|
+{blocks}
+
+Колонки L0 / L1 обновляет CLI-агент после приёмки уровня (`☐` → `✅`). Больше в этом файле ничего не менять.
+
+## Мои обязанности по чужим блокам
+- Запасной по блокам: {backup}. Если владелец выпал на 3 часа без PR — блок переходит ко мне.
+- Первое ревью блоков: {review}. Ревью ≤ 15 минут: критерии приёмки закрыты тестами · пути не нарушены · модели контрактов не скопированы · есть откат на L0.
+
+## Цикл одной задачи
+1. Контракт целиком → планировщику. Он выдаёт доску из 5–9 задач L0 и дальше задачи по одной.
+2. Задачу → CLI-агенту. Смотри diff: файл вне «Разрешённых путей» контракта — откати.
+3. Проверку из задачи запусти сам, вывод → планировщику: `готово N`.
+4. Все ✅ → агент пишет «Отчёт» в `docs/status/<ID>.md`, ты открываешь PR в `{branch}` и кидаешь отчёт в чат.
+5. Следующий уровень только после `L0 принят` от ревьюера. Пока ждёшь — L0 следующего своего блока.
+
+## Куда идти с вопросами
+- Не хватает поля в моделях или нужен файл вне своих путей → Арсений или Некит.
+- Не понял контракт → владелец блока-соседа из таблицы в `docs/BLOCKS.md`, потом Арсений.
+- Сломался `dev` → переключи блок на L0 переменной окружения, потом `git revert` merge-коммита.
+"""
+
+REFERENCE_README = """\
+# Референсы {id} · {title}
+
+> **Референсы фиксированы.** Агент пишет код в стиле и структуре этих файлов и не предлагает свою архитектуру, другие библиотеки, другую раскладку файлов. Расхождение референса с контрактом — контракт главнее; напиши об этом в отчёте. Папку `docs/references/` менять нельзя.
+
+## Какие образцы применять
+{patterns}
+
+## Что зафиксировано контрактом (не обсуждается)
+Порт блока (сигнатуры — из контракта, реализация — по образцу):
+{port}
+
+Переключатель уровня: {env}. По умолчанию L0. Ошибка L1 → откат на L0 + запись в лог.
+
+## Куда смотреть в каркасе
+{nests}
+
+## Данные для тестов
+Только `backend/app/fixtures/demo_city.json` (фронт — `frontend/src/mocks/demo_city.json`, копия). Эталон — раздел `expect`. Критерии приёмки, которые должны стать тестами:
+{accept}
+"""
+
+PATTERNS_BY_GROUP = {
+    "CORE": ["_patterns/backend_block/", "_patterns/frontend_feature/"],
+    "BACKEND": ["_patterns/backend_block/"],
+    "DATA": ["_patterns/backend_block/"],
+    "LLM": ["_patterns/backend_block/", "_patterns/llm_call/"],
+    "FRONTEND": ["_patterns/frontend_feature/"],
+    "OPTIONAL": ["_patterns/backend_block/", "_patterns/frontend_feature/"],
+}
+
 COMMON_RULES = """\
 1. **Трогай только файлы из раздела «Разрешённые пути».** Нужно изменить что-то вне списка — ОСТАНОВИСЬ и напиши владельцу этого файла. CI отклонит PR, который вышел за свои пути.
 2. **Модели из `backend/app/contracts/models.py` не менять и не копировать.** Только импортировать. Не хватает поля — остановись, напиши Арсению или Некиту.
@@ -873,6 +986,12 @@ def render(b: dict, classes: dict[str, str]) -> str:
         *[f"- {f}" for f in b["forbidden"]],
         "",
     ]
+    parts += [
+        "## Референсы (фиксированы)",
+        f"Папка `docs/references/{b['id']}/` — образцы структуры и стиля кода для этого блока и общие шаблоны `docs/references/_patterns/`. "
+        "Агент пишет код по ним и **не предлагает свою архитектуру, библиотеки или раскладку файлов**. Референс противоречит контракту → контракт главнее, расхождение — в отчёт.",
+        "",
+    ]
     if b.get("notes"):
         parts += ["## Примечание", b["notes"], ""]
     parts += [
@@ -882,9 +1001,9 @@ def render(b: dict, classes: dict[str, str]) -> str:
         "1. Вставь этот файл целиком в чат-нейронку (ChatGPT, нет — Qwen). Она работает по «Инструкции для планировщика» и выдаёт доску задач.",
         "2. Копируй задачи по одной в CLI-агент. Смотри diff: файл вне «Разрешённых путей» — откати.",
         "3. Запусти проверку из задачи сам, пришли вывод планировщику: `готово N` + вывод. Доску из ответа сохрани в `docs/status/<ID>.md` и закоммить вместе с кодом.",
-        "4. Все ✅ → попроси нейронку сломать реализацию и убедись, что тесты падают. Открой PR, отправь отчёт в чат по шаблону ниже. Следующий уровень — только после `L0 принят`.",
+        "4. Все ✅ → попроси нейронку сломать реализацию и убедись, что тесты падают. Агент дописывает раздел «Отчёт» в `docs/status/<ID>.md` по шаблону ниже и ставит ✅ уровню в `docs/team/<Владелец>.md`. Открой PR, тот же отчёт — в чат. Следующий уровень — только после `L0 принят`.",
         "",
-        "## Отчёт в чат",
+        "## Отчёт (в `docs/status/<ID>.md` и в чат)",
         REPORT_TEMPLATE,
         "",
     ]
@@ -908,6 +1027,61 @@ def blocks_table(previous: str = "") -> str:
     return "\n".join(rows)
 
 
+
+def owned(code: str) -> list[dict]:
+    return [b for b in BLOCKS if b["owner"] == code]
+
+
+def write_team() -> None:
+    out = ROOT / "docs/team"
+    out.mkdir(parents=True, exist_ok=True)
+    by_id = {b["id"]: b for b in BLOCKS}
+    rows = []
+    for code, (branch, role, order) in ROLES.items():
+        name = person(code)
+        reviews = [b["id"] for b in BLOCKS if b["reviewer"] == code]
+        rows.append(
+            f"| **{name}** | [`docs/team/{name}.md`]({name}.md) | `{branch}` | {', '.join(i for i, _ in order)} | "
+            f"{', '.join(reviews) or '—'} | Арсений или Некит (не автор) |"
+        )
+        blocks = []
+        for i, (bid, when) in enumerate(order, 1):
+            b = by_id[bid]
+            assert b["owner"] == code, f"{bid}: владелец {b['owner']}, а в ROLES у {code}"
+            blocks.append(
+                f"| {i} | `{bid}` | {b['title']} | {when} | [контракт](../contracts/{bid}_{b['name']}.md) | "
+                f"[доска](../status/{bid}.md) | [референсы](../references/{bid}/README.md) | ☐ | ☐ |"
+            )
+        missing = [b["id"] for b in owned(code) if b["id"] not in {i for i, _ in order}]
+        assert not missing, f"{name}: блоки {missing} не в порядке ROLES"
+        backup = [b["id"] for b in BLOCKS if b["backup"] == code]
+        (out / f"{name}.md").write_text(
+            PERSON_TEMPLATE.format(
+                name=name, role=role, branch=branch, blocks="\n".join(blocks),
+                backup=", ".join(backup) or "—", review=", ".join(reviews) or "—",
+            ),
+            encoding="utf-8",
+        )
+    (out / "README.md").write_text(TEAM_README.format(rows="\n".join(rows)), encoding="utf-8")
+
+
+def write_references(classes: dict[str, str]) -> None:
+    out = ROOT / "docs/references"
+    out.mkdir(parents=True, exist_ok=True)
+    for b in BLOCKS:
+        d = out / b["id"]
+        d.mkdir(exist_ok=True)
+        patterns = "\n".join(f"- `docs/references/{p}`" for p in PATTERNS_BY_GROUP[b["group"]])
+        nests = "\n".join(f"- `{p}`" for p in b["paths"])
+        accept = "\n".join(f"{i}. {a}" for i, a in enumerate(b["accept"], 1))
+        (d / "README.md").write_text(
+            REFERENCE_README.format(
+                id=b["id"], title=b["title"], patterns=patterns, port=b["port"], env=b["env"], nests=nests, accept=accept
+            ),
+            encoding="utf-8",
+        )
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     classes = class_sources()
@@ -915,7 +1089,12 @@ def main() -> None:
         old.unlink()
     for b in BLOCKS:
         (OUT / f"{b['id']}_{b['name']}.md").write_text(render(b, classes), encoding="utf-8")
-    paths = {b["id"]: b["paths"] + [f"docs/contracts/{b['id']}_*", f"docs/status/{b['id']}.md"] for b in BLOCKS}
+    paths = {
+        b["id"]: b["paths"] + [f"docs/contracts/{b['id']}_*", f"docs/status/{b['id']}.md", f"docs/team/{person(b['owner'])}.md"]
+        for b in BLOCKS
+    }
+    write_team()
+    write_references(classes)
     status_dir = ROOT / "docs/status"
     status_dir.mkdir(parents=True, exist_ok=True)
     for b in BLOCKS:  # файлы статуса создаются один раз и дальше живут своей жизнью

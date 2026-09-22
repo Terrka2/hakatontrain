@@ -8,6 +8,7 @@
 /docs/                           @arseniistrokov @NEKIT_LOGIN
 # Доски задач блоков правит владелец блока — без обязательного ревью
 /docs/status/
+/docs/team/
 
 # Данные и LLM
 /backend/app/db/                 @NEKIT_LOGIN

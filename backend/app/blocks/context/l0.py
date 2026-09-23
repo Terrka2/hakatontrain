@@ -57,7 +57,7 @@ def _category(job: Job, rep_map: dict[str, str]) -> str:
     if job.skill == "green":
         return "tree"
     for cid in job.cluster_ids:
-        c = rep_map.get(cid, cid.lower())
+        c = rep_map.get(cid.removeprefix("cl_"), cid.lower())
         if "pothole" in c:
             return "pothole"
         if "tree" in c and "street" not in c:

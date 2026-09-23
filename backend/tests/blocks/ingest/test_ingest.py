@@ -735,6 +735,7 @@ def test_l2_flag_not_set_uses_l1(
 ) -> None:
     """При USE_MOCK=false и без доступного geocoder B2 — работает L1 (как раньше)."""
     monkeypatch.setattr(settings, "USE_MOCK", False)
+    monkeypatch.setattr("app.blocks.ingest.l2.is_geocoder_available", lambda: False)
 
     data = [
         {

@@ -1,0 +1,153 @@
+# backend/app/blocks/ingest/synonyms.yaml
+# Таблица синонимов категорий обращений на RO / RU / EN к каноническим значениям CATEGORIES
+
+pothole:
+  - pothole
+  - road_pothole
+  - road_damage
+  - hole
+  - groapa
+  - groapă
+  - gropi
+  - asfalt_deteriorat
+  - carosabil
+  - crater
+  - яма
+  - выбоина
+  - провал
+  - неровность
+  - дефект_дороги
+  - провал_асфальта
+  - выбоины
+
+streetlight:
+  - streetlight
+  - street_light
+  - lamp
+  - lighting
+  - iluminat
+  - iluminat_stradal
+  - felinar
+  - bec_ars
+  - stalp_iluminat
+  - stâlp_iluminat
+  - освещение
+  - уличный_фонарь
+  - фонарь
+  - не_горит_фонарь
+  - перегорела_лампа
+  - темно
+  - фонари
+
+garbage:
+  - garbage
+  - trash
+  - waste
+  - litter
+  - gunoi
+  - deseuri
+  - deșeuri
+  - tomberoane
+  - container_plin
+  - salubrizare
+  - мусор
+  - свалка
+  - переполненные_баки
+  - контейнеры
+  - грязь
+  - отходы
+  - переполненные_контейнеры
+
+manhole:
+  - manhole
+  - sewer_cover
+  - open_manhole
+  - canal
+  - gura_de_canal
+  - gură_de_canal
+  - capac_canal
+  - canalizare
+  - люк
+  - открытый_люк
+  - колодец
+  - крышка_люка
+  - ливневка
+  - ливнёвка
+  - люки
+
+tree:
+  - tree
+  - fallen_tree
+  - fallen_branch
+  - copac
+  - arbore
+  - creanga_cazuta
+  - creangă_căzută
+  - crengi
+  - copac_cazut
+  - дерево
+  - упавшее_дерево
+  - ветка
+  - ветки
+  - сломанная_ветка
+  - поваленное_дерево
+  - нависла_ветка
+  - упавшие_ветки
+
+water_leak:
+  - water_leak
+  - leak
+  - pipe_burst
+  - scurgere
+  - scurgere_apa
+  - scurgere_apă
+  - teava_sparta
+  - țeavă_spartă
+  - inundatie
+  - inundație
+  - утечка_воды
+  - прорыв_трубы
+  - течь
+  - течет_вода
+  - течёт_вода
+  - лужа_из_трубы
+  - порыв_водопровода
+  - авария_водопровода
+
+traffic_sign:
+  - traffic_sign
+  - sign
+  - traffic_light
+  - indicator
+  - indicator_rutier
+  - semafor
+  - semafor_defect
+  - semn_circulatie
+  - semn_circulație
+  - дорожный_знак
+  - знак
+  - светофор
+  - сломан_светофор
+  - знак_упал
+  - поврежден_знак
+
+public_space:
+  - public_space
+  - park
+  - playground
+  - bench
+  - spatiu_public
+  - spațiu_public
+  - parc
+  - banca
+  - bancă
+  - teren_joaca
+  - teren_de_joacă
+  - сквер
+  - общественное_пространство
+  - скамейка
+  - лавочка
+  - скамейки
+  - детская_площадка
+  - площадка
+  - парк

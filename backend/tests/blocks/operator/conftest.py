@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from app.api.deps import get_current_user
 from app.api.routes import clusters as clusters_api
 from app.api.routes import operator as operator_api
+from app.api.routes import plan as plan_api
 from app.blocks import clusters, context, dispatch, extractor, ingest, priority
 from app.blocks.operator import l0
 from app.contracts.models import (
@@ -191,6 +192,7 @@ def api() -> Iterator[TestClient]:
     app = FastAPI()
     app.include_router(clusters_api.router, prefix="/api/v1")
     app.include_router(operator_api.router, prefix="/api/v1")
+    app.include_router(plan_api.router, prefix="/api/v1")
     app.dependency_overrides[get_current_user] = lambda: User(
         email="supervisor@demo.md", role="supervisor", hashed_password="unused"
     )

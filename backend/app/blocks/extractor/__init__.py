@@ -5,14 +5,12 @@
 
 from app.contracts.models import Extracted, Report, Verification
 
+from . import l0
+
 
 def extract(report: Report) -> Extracted:
-    raise NotImplementedError(
-        "L1: реализуй по контракту docs/contracts/L1_extractor.md"
-    )
+    return l0.extract(report)
 
 
 def verify(report: Report, nearby: list[Report]) -> Verification:
-    raise NotImplementedError(
-        "L1: реализуй по контракту docs/contracts/L1_extractor.md"
-    )
+    return l0.verify(report, nearby)

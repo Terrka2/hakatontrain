@@ -14,24 +14,26 @@ from app.contracts.models import (
     Priority,
 )
 
+from . import l0
+
 BATCH_RADIUS_M = 450
 
 
 def make_jobs(
     clusters: list[Cluster], priorities: dict[str, Priority], ctx: Context
 ) -> tuple[list[Job], list[Decision]]:
-    raise NotImplementedError("B6: реализуй по контракту docs/contracts/B6_dispatch.md")
+    return l0.make_jobs(clusters, priorities, ctx)
 
 
 def solve(jobs: list[Job], crews: list[Crew], ctx: Context) -> Plan:
-    raise NotImplementedError("B6: реализуй по контракту docs/contracts/B6_dispatch.md")
+    return l0.solve(jobs, crews, ctx)
 
 
 def replan(
     plan: Plan, update: JobUpdate, jobs: list[Job], crews: list[Crew], ctx: Context
 ) -> Plan:
-    raise NotImplementedError("B6: реализуй по контракту docs/contracts/B6_dispatch.md")
+    return l0.replan(plan, update, jobs, crews, ctx)
 
 
 def baseline_total_priority(jobs: list[Job], crews: list[Crew]) -> int:
-    raise NotImplementedError("B6: реализуй по контракту docs/contracts/B6_dispatch.md")
+    return l0.baseline_total_priority(jobs, crews)

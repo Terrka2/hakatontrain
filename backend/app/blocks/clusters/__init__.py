@@ -18,4 +18,6 @@ DUP_WINDOW_DAYS = 30
 def build_clusters(
     reports: list[Report], similarity: SimilarityFn | None = None
 ) -> list[Cluster]:
-    raise NotImplementedError("B3: реализуй по контракту docs/contracts/B3_clusters.md")
+    from .l0 import build_clusters as build
+
+    return build(reports, similarity)

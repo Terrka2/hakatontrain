@@ -1,33 +1,40 @@
 """Блок D2 · Эмбеддинги и семантический поиск (RAG). Порт блока — только то, что объявлено в этом файле.
 
-Контракт: docs/contracts/D2_search.md. Реализация: l0.py (tfidf), l1.py (sentence-transformers).
+Контракт: docs/contracts/D2_search.md. Реализация: l0.py (TF-IDF, по умолчанию), l1.py (sentence-transformers).
 """
 
 import logging
+from typing import Literal
+
+from pydantic import BaseModel
 
 from app.core.config import settings
 
-from . import l0, l1
-from .models import Hit
-
 log = logging.getLogger(__name__)
 
-__all__ = ["Hit", "embed", "search", "text_similarity"]
+
+class Hit(BaseModel):
+    kind: Literal["report", "event"]
+    id: str
+    score: float
+    snippet: str
+
+
+from . import l0, l1  # noqa: E402, I001 — после Hit, чтобы l0/l1 могли импортировать его без цикла
 
 
 def embed(texts: list[str]) -> list[list[float]]:
-    """Единая точка входа. Уровень выбирается переключателем EMBEDDER."""
+    """Единая точка входа. Уровень выбирается переключателем EMBEDDER из контракта."""
     if settings.EMBEDDER == "tfidf":
         return l0.embed(texts)
     try:
         return l1.embed(texts)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 — любая ошибка L1 = тихий откат на L0, не падение
         log.warning("D2: L1 embed failed, falling back to L0", exc_info=True)
         return l0.embed(texts)
 
 
 def text_similarity(a: str, b: str) -> float:
-    """Схожесть двух текстов [0, 1]. Передаётся в B3 для дедупликации."""
     if settings.EMBEDDER == "tfidf":
         return l0.text_similarity(a, b)
     try:
@@ -38,11 +45,10 @@ def text_similarity(a: str, b: str) -> float:
 
 
 def search(query: str, k: int = 5, kind: str | None = None) -> list[Hit]:
-    """Семантический поиск по обращениям и событиям."""
     if settings.EMBEDDER == "tfidf":
-        return l0.search(query, k=k, kind=kind)
+        return l0.search(query, k, kind)
     try:
-        return l1.search(query, k=k, kind=kind)
+        return l1.search(query, k, kind)
     except Exception:  # noqa: BLE001
         log.warning("D2: L1 search failed, falling back to L0", exc_info=True)
-        return l0.search(query, k=k, kind=kind)
+        return l0.search(query, k, kind)

@@ -1,216 +1,102 @@
-"""Уровень L0 · TF-IDF по символьным n-граммам.
+"""L0: TF-IDF по символьным n-граммам (работает и для RU, и для RO). Индекс в памяти, без сети.
 
-Индекс строится в памяти на основе backend/app/fixtures/demo_city.json.
-Работает для RU и RO без загрузки внешних нейросетевых моделей.
+Детерминированно: одни данные → один и тот же результат, включая порядок в списках.
 """
 
-from __future__ import annotations
-
 import json
+from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypedDict
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from .models import Hit
+from . import Hit
 
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "demo_city.json"
+FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "demo_city.json"
 
-SYNONYMS: dict[str, str] = {
-    # Ямы и дорожные дефекты (RU / RO)
-    "яма": "яма groapa pothole",
-    "ямы": "яма groapa pothole",
-    "яму": "яма groapa pothole",
-    "яме": "яма groapa pothole",
-    "ямах": "яма groapa pothole",
-    "groapă": "яма groapa pothole",
-    "groapa": "яма groapa pothole",
-    "gropi": "яма groapa pothole",
-    "gropile": "яма groapa pothole",
-    # Школа и лицей (RU / RO)
-    "лицей": "лицей школа liceu scoala",
-    "лицея": "лицей школа liceu scoala",
-    "лицее": "лицей школа liceu scoala",
-    "лицею": "лицей школа liceu scoala",
-    "liceu": "лицей школа liceu scoala",
-    "liceului": "лицей школа liceu scoala",
-    "школа": "лицей школа liceu scoala",
-    "школы": "лицей школа liceu scoala",
-    "школе": "лицей школа liceu scoala",
-    "школу": "лицей школа liceu scoala",
-    "scoala": "лицей школа liceu scoala",
-    "școală": "лицей школа liceu scoala",
-    # Дети (RU / RO)
-    "дети": "дети copii",
-    "детей": "дети copii",
-    "детям": "дети copii",
-    "copii": "дети copii",
-    "copiii": "дети copii",
-    # Мероприятия / забег
-    "забег": "забег sprint alergare",
-    "забега": "забег sprint alergare",
-    "sprint": "забег sprint alergare",
-    "maraton": "забег марафон",
-    "марафон": "забег марафон",
-}
+_SNIPPET_LEN = 160
 
 
-def _preprocess(text: str | None) -> str:
-    """Нормализует текст и расширяет базовые двуязычные синонимы."""
-    if not text or not isinstance(text, str):
-        return ""
-    clean = text.lower()
-    for ch in [",", ".", "!", "?", ";", ":", "—", "-", "(", ")", '"', "'", "\n", "\t"]:
-        clean = clean.replace(ch, " ")
-    words = clean.split()
-    expanded: list[str] = []
-    for w in words:
-        expanded.append(w)
-        if w in SYNONYMS:
-            expanded.append(SYNONYMS[w])
-    return " ".join(expanded)
+class _Doc(TypedDict):
+    kind: Literal["report", "event"]
+    id: str
+    text: str
 
 
-class _DocEntry:
-    __slots__ = ("id", "kind", "snippet", "text")
-
-    def __init__(
-        self,
-        kind: Literal["report", "event"],
-        doc_id: str,
-        text: str,
-        snippet: str,
-    ) -> None:
-        self.kind = kind
-        self.id = doc_id
-        self.text = text
-        self.snippet = snippet
+def _vectorizer() -> TfidfVectorizer:
+    return TfidfVectorizer(analyzer="char_wb", ngram_range=(1, 3), min_df=1)
 
 
-class SearchIndexL0:
-    """Индекс L0 в памяти на базе TF-IDF векторизатора."""
-
-    def __init__(self, fixture_path: Path = FIXTURE_PATH) -> None:
-        self.docs: list[_DocEntry] = []
-        self.vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5))
-        self._load_and_build_index(fixture_path)
-
-    def _load_and_build_index(self, path: Path) -> None:
-        if not path.exists():
-            return
-
-        data = json.loads(path.read_text(encoding="utf-8"))
-
-        for r in data.get("reports", []):
-            text = r.get("text", "")
-            self.docs.append(
-                _DocEntry(
-                    kind="report",
-                    doc_id=r["id"],
-                    text=text,
-                    snippet=text[:120],
-                )
-            )
-
-        for e in data.get("events", []):
-            title = e.get("title", "")
-            self.docs.append(
-                _DocEntry(
-                    kind="event",
-                    doc_id=e["id"],
-                    text=title,
-                    snippet=title,
-                )
-            )
-
-        corpus = [_preprocess(d.text) for d in self.docs]
-        if corpus:
-            self.doc_vectors = self.vectorizer.fit_transform(corpus)
-        else:
-            self.doc_vectors = None
-
-    def text_similarity(self, a: str | None, b: str | None) -> float:
-        """Вычисляет косинусное сходство двух текстов в диапазоне [0.0, 1.0]."""
-        if not a or not b or not isinstance(a, str) or not isinstance(b, str):
-            return 0.0
-        if not a.strip() or not b.strip():
-            return 0.0
-        if a.strip() == b.strip():
-            return 1.0
-
-        prep_a = _preprocess(a)
-        prep_b = _preprocess(b)
-        if not prep_a or not prep_b:
-            return 0.0
-
-        vec_a = self.vectorizer.transform([prep_a])
-        vec_b = self.vectorizer.transform([prep_b])
-        sim = float(cosine_similarity(vec_a, vec_b)[0][0])
-        return max(0.0, min(1.0, round(sim, 6)))
-
-    def search(
-        self,
-        query: str,
-        k: int = 5,
-        kind: Literal["report", "event"] | str | None = None,
-    ) -> list[Hit]:
-        """Семантический поиск по обращениям и событиям."""
-        if k <= 0 or not query or not isinstance(query, str) or not query.strip():
-            return []
-        if self.doc_vectors is None or not self.docs:
-            return []
-
-        prep_q = _preprocess(query)
-        if not prep_q:
-            return []
-
-        q_vec = self.vectorizer.transform([prep_q])
-        scores = cosine_similarity(q_vec, self.doc_vectors)[0]
-
-        candidates: list[tuple[float, str, _DocEntry]] = []
-        for i, doc in enumerate(self.docs):
-            if kind is not None and doc.kind != kind:
-                continue
-            candidates.append((float(scores[i]), doc.id, doc))
-
-        # Сортировка по убыванию score, вторично по id для детерминированности
-        candidates.sort(key=lambda c: (-c[0], c[1]))
-
-        return [
-            Hit(
-                kind=doc.kind,
-                id=doc.id,
-                score=max(0.0, min(1.0, round(score, 4))),
-                snippet=doc.snippet,
-            )
-            for score, _, doc in candidates[:k]
-        ]
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Векторизует список текстов."""
-        if not texts:
-            return []
-        prep_texts = [_preprocess(t) for t in texts]
-        vecs = self.vectorizer.transform(prep_texts)
-        return vecs.toarray().tolist()
+def _snippet(text: str) -> str:
+    flat = " ".join(text.split())
+    if len(flat) <= _SNIPPET_LEN:
+        return flat
+    return flat[: _SNIPPET_LEN - 1].rstrip() + "…"
 
 
-# Инициализация синглтона индекса L0 в памяти при загрузке модуля
-_index = SearchIndexL0()
+@lru_cache(maxsize=1)
+def _corpus() -> tuple[_Doc, ...]:
+    """Тексты обращений и событий из fixture. Только локальный файл, без сети."""
+    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    docs: list[_Doc] = []
+    for r in data.get("reports", []):
+        docs.append(
+            {"kind": "report", "id": r["id"], "text": (r.get("text") or "").strip()}
+        )
+    for e in data.get("events", []):
+        docs.append(
+            {"kind": "event", "id": e["id"], "text": (e.get("title") or "").strip()}
+        )
+    return tuple(docs)
 
 
 def embed(texts: list[str]) -> list[list[float]]:
-    return _index.embed(texts)
+    """Возвращает TF-IDF вектор для каждого текста (совместная матрица по всему списку)."""
+    cleaned = [(t or "").strip() for t in texts]
+    if not cleaned:
+        return []
+    if all(not t for t in cleaned):
+        return [[0.0] for _ in cleaned]
+    matrix = _vectorizer().fit_transform(cleaned)
+    return [[float(x) for x in row] for row in matrix.toarray()]
 
 
 def text_similarity(a: str, b: str) -> float:
-    return _index.text_similarity(a, b)
+    """Косинусная близость 0..1 по символьным n-граммам. Пустая строка → 0.0."""
+    a_clean = (a or "").strip()
+    b_clean = (b or "").strip()
+    if not a_clean or not b_clean:
+        return 0.0
+    matrix = _vectorizer().fit_transform([a_clean, b_clean])
+    sim = cosine_similarity(matrix[0:1], matrix[1:2])[0][0]
+    return float(max(0.0, min(1.0, sim)))
 
 
-def search(
-    query: str,
-    k: int = 5,
-    kind: Literal["report", "event"] | str | None = None,
-) -> list[Hit]:
-    return _index.search(query, k=k, kind=kind)
+def rank(docs: list[_Doc], sims: list[float], k: int) -> list[Hit]:
+    """Общее ранжирование для L0 и L1: сортировка по score (детерминированная при ничьей)."""
+    ranked = sorted(
+        zip(docs, sims, strict=True),
+        key=lambda pair: (-float(pair[1]), pair[0]["kind"], pair[0]["id"]),
+    )
+    return [
+        Hit(
+            kind=d["kind"],
+            id=d["id"],
+            score=float(round(s, 6)),
+            snippet=_snippet(d["text"]),
+        )
+        for d, s in ranked[:k]
+        if s > 0.0
+    ]
+
+
+def search(query: str, k: int = 5, kind: str | None = None) -> list[Hit]:
+    """Топ-k совпадений по обращениям и событиям fixture. Детерминированный порядок при равном score."""
+    query_clean = (query or "").strip()
+    docs = [d for d in _corpus() if (kind is None or d["kind"] == kind) and d["text"]]
+    if not query_clean or k <= 0 or not docs:
+        return []
+    matrix = _vectorizer().fit_transform([query_clean, *(d["text"] for d in docs)])
+    sims = cosine_similarity(matrix[0:1], matrix[1:])[0]
+    return rank(docs, sims, k)

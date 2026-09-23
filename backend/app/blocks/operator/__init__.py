@@ -17,7 +17,14 @@ from app.contracts.models import (
 )
 
 from . import l0
-from .l0 import get_cluster, get_clusters, get_plan, get_runs, review_cluster
+from .l0 import (
+    fixture_now,
+    get_cluster,
+    get_clusters,
+    get_plan,
+    get_runs,
+    review_cluster,
+)
 
 __all__ = [
     "PipelineResult",
@@ -28,6 +35,7 @@ __all__ = [
     "get_plan",
     "get_runs",
     "review_cluster",
+    "fixture_now",
 ]
 
 

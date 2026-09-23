@@ -92,6 +92,24 @@ class Priority(BaseModel):
     needs_review: bool = False
 
 
+class ClusterOut(Cluster):
+    """B0 response; unavailable scoring is explicit, never a fabricated zero."""
+
+    priority: Priority | None = None
+
+
+class ClusterDetail(ClusterOut):
+    reports: list[Report]
+
+
+class ClusterReview(BaseModel):
+    decision: Literal["accept", "reject"]
+
+
+class OperatorRunRequest(BaseModel):
+    trigger: Literal["manual"] = "manual"
+
+
 class Weather(BaseModel):
     at: datetime
     precipitation_mm: float

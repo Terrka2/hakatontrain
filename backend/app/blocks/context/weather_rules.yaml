@@ -1,0 +1,16 @@
+rules:
+  - id: defer_potholes
+    type: defer
+    target: {category: pothole, skill: road}
+    condition: {field: precipitation_mm, op: ">=", value: 5.0}
+    action: {decision_kind: defer, reason: "Осадки >= 5 мм: ямочный ремонт отложен"}
+  - id: boost_trees
+    type: boost
+    target: {category: tree}
+    condition: {field: wind_ms, op: ">=", value: 15.0}
+    action: {delta_priority: 20, max_priority: 100, decision_kind: boost, reason: "Ветер >= 15 м/с: повышен приоритет работ по деревьям"}
+  - id: slow_other_works
+    type: slow
+    target: {exclude_categories: [pothole, tree]}
+    condition: {field: precipitation_mm, op: ">=", value: 5.0}
+    action: {factor: 1.3, decision_kind: param, reason: "Осадки >= 5 мм: время уличных работ увеличено в 1.3 раза"}

@@ -1,6 +1,5 @@
 """Роуты блока B0. Контракт: docs/contracts/B0_*.md."""
 
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,7 +25,7 @@ def read_runs(limit: Annotated[int, Query(ge=1, le=100)] = 20) -> list[OperatorR
 )
 def run_operator(body: OperatorRunRequest) -> OperatorRun:
     try:
-        return operator.operator_run(body.trigger, datetime.now(UTC))
+        return operator.operator_run(body.trigger, operator.fixture_now())
     except NotImplementedError as exc:
         raise HTTPException(
             status_code=503, detail="Operator dependencies are not ready"

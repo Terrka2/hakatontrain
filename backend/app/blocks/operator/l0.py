@@ -228,9 +228,14 @@ def get_plan(plan_id: str) -> Plan | None:
 
 def _ensure_loaded() -> None:
     if not _runs:
-        fixture = json.loads(
-            (Path(__file__).resolve().parents[2] / "fixtures/demo_city.json").read_text(
-                encoding="utf-8"
-            )
+        operator_run("manual", fixture_now())
+
+
+def fixture_now() -> datetime:
+    """L0 uses the fixture's simulation clock, matching its reports and shifts."""
+    fixture = json.loads(
+        (Path(__file__).resolve().parents[2] / "fixtures/demo_city.json").read_text(
+            encoding="utf-8"
         )
-        operator_run("manual", datetime.fromisoformat(fixture["now"]))
+    )
+    return datetime.fromisoformat(fixture["now"])

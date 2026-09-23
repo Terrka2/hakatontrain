@@ -135,8 +135,7 @@
   "F1": [
     "frontend/src/features/map/**",
     "frontend/src/routes/_layout/index.tsx",
-    "frontend/src/lib/api.ts",
-    "frontend/src/lib/ui-state.ts",
+    "frontend/src/lib/**",
     "docs/contracts/F1_*",
     "docs/status/F1.md",
     "docs/team/Арсений.md"

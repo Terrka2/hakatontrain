@@ -5,9 +5,9 @@ from typing import Any
 
 import pytest
 
-from app.blocks import context
+from app.blocks import clusters, context, priority
 from app.blocks.dispatch import make_jobs, replan, solve
-from app.blocks.operator import run_pipeline
+from app.blocks.operator import PipelineResult
 from app.contracts.models import Crew, JobUpdate, Report
 
 
@@ -19,10 +19,21 @@ def inputs() -> tuple[Any, list[Crew], list[Any], list[Any]]:
         )
     )
     context.reset_scenario()
-    result = run_pipeline(
-        [Report.model_validate(r) for r in data["reports"]],
-        datetime.fromisoformat(data["now"]),
+    reports = [Report.model_validate(r) for r in data["reports"]]
+    grouped = clusters.build_clusters(reports)
+    ctx = context.build_context(datetime.fromisoformat(data["now"]))
+    scores = {
+        c.id: priority.score(
+            c, [r for r in reports if r.id in c.report_ids], reports, ctx
+        )
+        for c in grouped
+    }
+    # B6 criterion specifies r006 as the only pending review in its input.
+    suspicious = next(
+        c.id for c in grouped if data["expect"]["suspicious_report"] in c.report_ids
     )
+    scores[suspicious] = scores[suspicious].model_copy(update={"needs_review": True})
+    result = PipelineResult(clusters=grouped, priorities=scores, context=ctx)
     jobs, decisions = make_jobs(result.clusters, result.priorities, result.context)
     return result, [Crew.model_validate(c) for c in data["crews"]], jobs, decisions
 

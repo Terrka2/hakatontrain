@@ -47,8 +47,10 @@ const useAuth = () => {
 
   const loginMutation = useMutation({
     mutationFn: login,
-    onSuccess: () => {
-      navigate({ to: "/" })
+    onSuccess: async () => {
+      const me = (await UsersService.readUserMe()).data
+      queryClient.setQueryData(["currentUser"], me)
+      navigate({ to: me.role === "crew" ? "/crew" : "/" })
     },
     onError: handleError.bind(showErrorToast),
   })

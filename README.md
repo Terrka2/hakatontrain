@@ -17,12 +17,16 @@ bun install                  # frontend-зависимости
 
 **Вариант А — всё в Docker:**
 ```bash
-docker compose watch         # backend :8000 · frontend :5173 · postgres · mailpit :8025
+docker compose up --build    # сайт и API :8000 · postgres :5432 · Mailpit :8025
 ```
+
+Перед запуском API сервис `prestart` применяет миграции и создаёт демо-пользователей.
+Фронтенд собирается в backend-образ и доступен на http://localhost:8000;
+Swagger — http://localhost:8000/docs. Для отслеживания изменений: `docker compose watch`.
 
 **Вариант Б — локально, в Docker только база и почта:**
 ```bash
-docker compose up -d db mailcatcher
+docker compose up -d db mailpit
 cd backend && uv run alembic upgrade head && uv run python app/initial_data.py
 uv run fastapi dev app/main.py          # http://localhost:8000/docs
 cd frontend && bun run dev              # http://localhost:5173

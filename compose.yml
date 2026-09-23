@@ -46,13 +46,16 @@ services:
       # Define the port inside of the Docker service to use
       - traefik.http.services.adminer.loadbalancer.server.port=8080
 
-  backend:
+  prestart:
     image: backend:latest
+    build: &backend-build
+      context: .
+      dockerfile: backend/Dockerfile
     depends_on:
       db:
         condition: service_healthy
-        restart: true
-    environment:
+    command: ["bash", "scripts/prestart.sh"]
+    environment: &backend-environment
       PROJECT_NAME: ${PROJECT_NAME:?Variable not set}
       SECRET_KEY: ${SECRET_KEY:?Variable not set}
       FIRST_SUPERUSER: ${FIRST_SUPERUSER:?Variable not set}
@@ -63,6 +66,18 @@ services:
       EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Variable not set}@db:5432/app
       SENTRY_DSN: ${SENTRY_DSN:-}
+      FASTAPI_ENV: ${FASTAPI_ENV:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-demo-citytriage}
+
+  backend:
+    image: backend:latest
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      prestart:
+        condition: service_completed_successfully
+    environment: *backend-environment
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
@@ -70,9 +85,7 @@ services:
       timeout: 5s
       retries: 5
 
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    build: *backend-build
     labels:
       # Enable Traefik for this service
       - traefik.enable=true

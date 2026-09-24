@@ -56,7 +56,7 @@
 | [`B3`](contracts/B3_clusters.md) | Дубликаты → кластеры | Женёк | Некит | B2, D2 | `pair/backend` | ☑ | ☐ | ☐ | принят и влит в dev 24.09 |
 | [`B4`](contracts/B4_priority.md) | Объяснимый приоритет | Пашок | Женёк | B2, B5, L1 | `pair/backend` | ☑ | ☑ | ☑ | принят и влит в dev 23.09 |
 | [`B5`](contracts/B5_context.md) | Контекст: погода и соц. объекты | Пашок | Некит | D1 | `pair/backend` | ☑ | ☑ | ☐ | принят и влит в dev 23.09 |
-| [`B6`](contracts/B6_dispatch.md) | Диспетчер: план и маршруты бригад | Женёк | Некит | B2, B3, B4, B5 | `pair/backend` | ☐ | ☐ | ☐ |  |
+| [`B6`](contracts/B6_dispatch.md) | Диспетчер: план и маршруты бригад | Женёк | Некит | B2, B3, B4, B5 | `pair/backend` | ☑ | ☐ | ☐ | принят и влит в dev 24.09 (критерий 8 частично — xfail, блокер вне путей B6, см. docs/status/B6.md) |
 | [`B7`](contracts/B7_navigator.md) | Навигатор жителя (дополнительный) | Женёк | Пашок | B2, B3, B4, X1 | `pair/backend` | ☐ | ☐ | ☐ |  |
 | [`B8`](contracts/B8_fieldwork.md) | Работа бригад: маршрут, статусы, «не могу» | Пашок | Женёк | B6, D1 | `pair/backend` | ☑ | ☑ | ☑ | принят и влит в dev 23.09 |
 | [`X1`](contracts/X1_events.md) | Мероприятия (дополнительный) | Пашок | Некит | B2, B5, D1 | `pair/backend` | ☑ | ☑ | ☑ | принят и влит в dev 23.09 |

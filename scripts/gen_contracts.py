@@ -821,7 +821,7 @@ def execute_pending(action: PendingAction, role: str, actor: str) -> BaseModel: 
  dict(id="F1", name="map", title="Карта и каркас экрана", group="FRONTEND", owner="A", backup="L", reviewer="N", branch="pair/frontend",
   depends=["C0"], consumers=["F2", "F3", "F5"],
   goal="Карта — главный экран. Один компонент карты на всё приложение; остальные фичи только передают ей слои.",
-  paths=["frontend/src/features/map/**", "frontend/src/routes/_layout/index.tsx", "frontend/src/lib/api.ts", "frontend/src/lib/ui-state.ts"],
+  paths=["frontend/src/features/map/**", "frontend/src/routes/_layout/index.tsx", "frontend/src/lib/**"],
   models=["GeoPoint", "Cluster", "Priority", "UIState"],
   port="""\
 ```tsx

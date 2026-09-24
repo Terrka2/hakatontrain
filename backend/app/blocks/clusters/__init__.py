@@ -1,6 +1,6 @@
 """Блок B3 · Дубликаты → кластеры. Порт блока — только то, что объявлено в этом файле.
 
-Контракт: docs/contracts/B3_clusters.md. Реализация: l0.py (заглушка), l1.py (целевой уровень).
+Контракт: docs/contracts/B3_clusters.md. L0: Jaccard; similarity передаётся вызывающим кодом.
 """
 
 from collections.abc import Callable
@@ -18,4 +18,6 @@ DUP_WINDOW_DAYS = 30
 def build_clusters(
     reports: list[Report], similarity: SimilarityFn | None = None
 ) -> list[Cluster]:
-    raise NotImplementedError("B3: реализуй по контракту docs/contracts/B3_clusters.md")
+    from .l0 import build_clusters as build
+
+    return build(reports, similarity)

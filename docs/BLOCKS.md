@@ -53,7 +53,7 @@
 | [`B0`](contracts/B0_operator.md) | ИИ-оператор: самостоятельный проход | Женёк | Некит | B1, B3, B4, B5, B6, D1, L1 | `pair/backend` | ☐ | ☐ | ☐ |  |
 | [`B1`](contracts/B1_ingest.md) | Парсер и импорт обращений | Пашок | Женёк | D1 | `pair/backend` | ☑ | ☑ | ☑ | принят и влит в dev 23.09 |
 | [`B2`](contracts/B2_geo.md) | Гео-утилиты | Пашок | Женёк | — | `pair/backend` | ☑ | ☑ | ☐ | принят и влит в dev 23.09 |
-| [`B3`](contracts/B3_clusters.md) | Дубликаты → кластеры | Женёк | Некит | B2, D2 | `pair/backend` | ☐ | ☐ | ☐ |  |
+| [`B3`](contracts/B3_clusters.md) | Дубликаты → кластеры | Женёк | Некит | B2, D2 | `pair/backend` | ☑ | ☐ | ☐ | принят и влит в dev 24.09 |
 | [`B4`](contracts/B4_priority.md) | Объяснимый приоритет | Пашок | Женёк | B2, B5, L1 | `pair/backend` | ☑ | ☑ | ☑ | принят и влит в dev 23.09 |
 | [`B5`](contracts/B5_context.md) | Контекст: погода и соц. объекты | Пашок | Некит | D1 | `pair/backend` | ☑ | ☑ | ☐ | принят и влит в dev 23.09 |
 | [`B6`](contracts/B6_dispatch.md) | Диспетчер: план и маршруты бригад | Женёк | Некит | B2, B3, B4, B5 | `pair/backend` | ☐ | ☐ | ☐ |  |

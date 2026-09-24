@@ -52,7 +52,7 @@ _SYNONYMS: dict[str, str] = {
     "maraton": "забег марафон",
     "марафон": "забег марафон",
 }
-_PUNCT = str.maketrans({c: " " for c in ",.!?;:—-()\"'\n\t"})
+_PUNCT = str.maketrans(dict.fromkeys(",.!?;:—-()\"'\n\t", " "))
 
 
 def _expand_synonyms(text: str) -> str:
@@ -119,7 +119,9 @@ def text_similarity(a: str, b: str) -> float:
         return 0.0
     if a_clean == b_clean:
         return 1.0
-    matrix = _vectorizer().fit_transform([_expand_synonyms(a_clean), _expand_synonyms(b_clean)])
+    matrix = _vectorizer().fit_transform(
+        [_expand_synonyms(a_clean), _expand_synonyms(b_clean)]
+    )
     sim = cosine_similarity(matrix[0:1], matrix[1:2])[0][0]
     return float(max(0.0, min(1.0, sim)))
 
